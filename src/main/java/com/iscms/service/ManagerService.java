@@ -1,0 +1,60 @@
+package com.iscms.service;
+
+import com.iscms.dao.ManagerDAO;
+import com.iscms.dao.ManagerDAOImpl;
+import com.iscms.model.Manager;
+
+import java.util.List;
+
+// Service class responsible for manager account management operations
+// Used exclusively by the Admin role (UC-AD01)
+public class ManagerService {
+
+    private final ManagerDAO managerDAO;
+
+    // Default constructor — creates concrete DAO implementation
+    public ManagerService() {
+        this.managerDAO = new ManagerDAOImpl();
+    }
+
+    // Constructor for unit testing — allows injecting a mock DAO object
+    public ManagerService(ManagerDAO managerDAO) {
+        this.managerDAO = managerDAO;
+    }
+
+    // Returns all manager records — used in admin dashboard manager list
+    public List<Manager> getAllManagers() {
+        return managerDAO.findAll();
+    }
+
+    // Adds a new manager account
+    // Hashes the plain text password before storing — BCrypt with cost factor 12
+    // Password is never stored as plain text
+    public void addManager(Manager manager) {
+        manager.setPassword(AuthService.hashPassword(manager.getPassword()));
+        managerDAO.insert(manager);
+    }
+
+    // Removes a manager account permanently
+    // Step 1: Nullify created_by FK on all events created by this manager
+    //         (required to avoid FK constraint violation on delete)
+    // Step 2: Delete the manager record
+    // Order is critical — reversing these steps would cause a runtime error
+    public void removeManager(int managerId) {
+        managerDAO.nullifyManagerEvents(managerId);
+        managerDAO.delete(managerId);
+    }
+
+    // Locks or unlocks a manager account
+    // true = locked (cannot log in), false = unlocked
+    public void setLockStatus(int managerId, boolean locked) {
+        managerDAO.updateLockStatus(managerId, locked);
+    }
+
+    // Resets the password for a manager account
+    // Hashes the new password before storing — plain text never saved
+    public void resetManagerPassword(int managerId, String newPassword) {
+        String hashed = AuthService.hashPassword(newPassword);
+        managerDAO.updatePassword(managerId, hashed);
+    }
+}
