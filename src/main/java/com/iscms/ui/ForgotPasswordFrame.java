@@ -5,22 +5,28 @@ import com.iscms.service.AuthService;
 import javax.swing.*;
 import java.awt.*;
 
-// Screen for resetting a member's password using their phone number
+// Screen for resetting a password using an identifier (no current password needed)
 // Accessible from the login screen via "Forgot Password" link
+// Supports all three roles: Member (phone), Manager (email), Trainer (username)
+// Note: Admin accounts are part of the Manager role — reset via the Manager option
 public class ForgotPasswordFrame extends JFrame {
 
-    // AuthService handles all password reset business logic
     private final AuthService authService = new AuthService();
+
+    private JRadioButton rbMember, rbManager, rbTrainer;
+    private JLabel lblIdentifier;
+    private JTextField txtIdentifier;
+    private JPasswordField txtNew;
+    private JPasswordField txtConfirm;
 
     public ForgotPasswordFrame() {
         setTitle("Reset Password");
-        setSize(420, 260);
+        setSize(440, 320);
         setLocationRelativeTo(null);
         setResizable(false);
         initUI();
     }
 
-    // Builds the password reset form
     private void initUI() {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
@@ -28,26 +34,44 @@ public class ForgotPasswordFrame extends JFrame {
         c.insets = new Insets(8, 8, 8, 8);
         c.fill = GridBagConstraints.HORIZONTAL;
 
-        // Input fields
-        JTextField txtPhone       = new JTextField();
-        JPasswordField txtNew     = new JPasswordField();
-        JPasswordField txtConfirm = new JPasswordField();
+        // Title
+        JLabel lblTitle = new JLabel("Reset Password", SwingConstants.CENTER);
+        lblTitle.setFont(new Font("Arial", Font.BOLD, 16));
+        lblTitle.setForeground(new Color(33, 87, 141));
+        c.gridx = 0; c.gridy = 0; c.gridwidth = 2;
+        panel.add(lblTitle, c);
 
-        // Phone number row
-        c.gridx = 0; c.gridy = 0; c.weightx = 0.4;
-        panel.add(new JLabel("Phone Number:"), c);
+        // Role selection — same layout as LoginFrame for consistency
+        rbMember  = new JRadioButton("Member",  true);
+        rbManager = new JRadioButton("Manager");
+        rbTrainer = new JRadioButton("Trainer");
+        ButtonGroup bg = new ButtonGroup();
+        bg.add(rbMember); bg.add(rbManager); bg.add(rbTrainer);
+
+        JPanel rolePanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        rolePanel.add(rbMember); rolePanel.add(rbManager); rolePanel.add(rbTrainer);
+        c.gridy = 1; panel.add(rolePanel, c);
+
+        // Identifier field — label changes based on selected role
+        lblIdentifier = new JLabel("Phone Number:");
+        c.gridx = 0; c.gridy = 2; c.gridwidth = 1; c.weightx = 0.4;
+        panel.add(lblIdentifier, c);
+
+        txtIdentifier = new JTextField(20);
         c.gridx = 1; c.weightx = 0.6;
-        panel.add(txtPhone, c);
+        panel.add(txtIdentifier, c);
 
-        // New password row
-        c.gridx = 0; c.gridy = 1; c.weightx = 0.4;
+        // New password
+        c.gridx = 0; c.gridy = 3; c.weightx = 0.4;
         panel.add(new JLabel("New Password:"), c);
+        txtNew = new JPasswordField(20);
         c.gridx = 1; c.weightx = 0.6;
         panel.add(txtNew, c);
 
-        // Confirm password row
-        c.gridx = 0; c.gridy = 2; c.weightx = 0.4;
+        // Confirm password
+        c.gridx = 0; c.gridy = 4; c.weightx = 0.4;
         panel.add(new JLabel("Confirm Password:"), c);
+        txtConfirm = new JPasswordField(20);
         c.gridx = 1; c.weightx = 0.6;
         panel.add(txtConfirm, c);
 
@@ -57,50 +81,71 @@ public class ForgotPasswordFrame extends JFrame {
         btnReset.setForeground(Color.WHITE);
         btnReset.setOpaque(true);
         btnReset.setBorderPainted(false);
-        c.gridx = 0; c.gridy = 3; c.gridwidth = 2;
+        c.gridx = 0; c.gridy = 5; c.gridwidth = 2;
         panel.add(btnReset, c);
+
         add(panel);
 
-        btnReset.addActionListener(e -> {
-            String phone   = txtPhone.getText().trim();
-            String newPass = new String(txtNew.getPassword());
-            String confirm = new String(txtConfirm.getPassword());
+        // Update identifier label dynamically when role changes
+        rbMember.addActionListener(e  -> lblIdentifier.setText("Phone Number:"));
+        rbManager.addActionListener(e -> lblIdentifier.setText("Email:"));
+        rbTrainer.addActionListener(e -> lblIdentifier.setText("Username:"));
 
-            // Validation step 1: required fields must not be empty
-            if (phone.isEmpty() || newPass.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Please fill in all fields.");
-                return;
-            }
+        btnReset.addActionListener(e -> handleReset());
+    }
 
-            // Validation step 2: password must be at least 8 characters
-            if (newPass.length() < 8) {
+    // Validates input and dispatches to the correct AuthService reset method based on role
+    private void handleReset() {
+        String identifier = txtIdentifier.getText().trim();
+        String newPass    = new String(txtNew.getPassword());
+        String confirm    = new String(txtConfirm.getPassword());
+
+        // Validation: required fields
+        if (identifier.isEmpty() || newPass.isEmpty() || confirm.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please fill in all fields.");
+            return;
+        }
+
+        // Validation: minimum password length
+        if (newPass.length() < 8) {
+            JOptionPane.showMessageDialog(this,
+                    "Password must be at least 8 characters.",
+                    "Validation Error", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Validation: passwords must match
+        if (!newPass.equals(confirm)) {
+            JOptionPane.showMessageDialog(this, "Passwords do not match.");
+            return;
+        }
+
+        // Dispatch to the correct reset method based on selected role
+        AuthService.ResetResult result;
+        String roleLabel;
+        if (rbMember.isSelected()) {
+            result = authService.resetMemberPassword(identifier, newPass);
+            roleLabel = "Member";
+        } else if (rbManager.isSelected()) {
+            // Covers both MANAGER and ADMIN roles — admin uses the same reset path
+            result = authService.resetManagerPasswordByEmail(identifier, newPass);
+            roleLabel = "Manager";
+        } else {
+            result = authService.resetTrainerPasswordByUsername(identifier, newPass);
+            roleLabel = "Trainer";
+        }
+
+        switch (result) {
+            case SUCCESS -> {
                 JOptionPane.showMessageDialog(this,
-                        "Password must be at least 8 characters.",
-                        "Validation Error", JOptionPane.WARNING_MESSAGE);
-                return;
+                        "Password reset successful! You can now log in.");
+                dispose();
             }
-
-            // Validation step 3: both password fields must match
-            if (!newPass.equals(confirm)) {
-                JOptionPane.showMessageDialog(this, "Passwords do not match.");
-                return;
-            }
-
-            // Delegate to AuthService — handles same-as-old and not-found checks
-            // BCrypt comparison and DB update happen in the service layer
-            AuthService.ResetResult result = authService.resetMemberPassword(phone, newPass);
-            switch (result) {
-                case SUCCESS -> {
-                    JOptionPane.showMessageDialog(this,
-                            "Password reset successful! You can now login.");
-                    dispose();
-                }
-                case SAME_AS_OLD -> JOptionPane.showMessageDialog(this,
-                        "New password cannot be the same as your current password.",
-                        "Validation Error", JOptionPane.WARNING_MESSAGE);
-                case NOT_FOUND -> JOptionPane.showMessageDialog(this,
-                        "Phone number not found.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        });
+            case SAME_AS_OLD -> JOptionPane.showMessageDialog(this,
+                    "New password cannot be the same as your current password.",
+                    "Validation Error", JOptionPane.WARNING_MESSAGE);
+            case NOT_FOUND -> JOptionPane.showMessageDialog(this,
+                    roleLabel + " account not found.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 }

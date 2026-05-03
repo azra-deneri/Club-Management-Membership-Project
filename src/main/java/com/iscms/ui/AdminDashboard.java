@@ -2,6 +2,7 @@ package com.iscms.ui;
 
 import com.iscms.model.Manager;
 import com.iscms.model.Payment;
+import com.iscms.service.AuthService;
 import com.iscms.service.ManagerService;
 import com.iscms.service.ReportService;
 
@@ -10,17 +11,17 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 
 // Admin dashboard — only accessible by users with ADMIN role
-// Provides 3 tabs: Manager list, Add Manager form, All Payments
+// Provides 4 tabs: Manager list, Add Manager, All Payments, My Profile
+// Note: Admin can no longer reset a manager's password — managers must use
+// the Forgot Password flow or update their password from their own profile.
+// Admin updates their own password from the My Profile tab here.
 public class AdminDashboard extends JFrame {
 
-    // The currently logged-in admin
     private final Manager admin;
-
-    // Service instances — no DAOs directly in UI layer
     private final ManagerService managerService = new ManagerService();
     private final ReportService reportService   = new ReportService();
+    private final AuthService   authService     = new AuthService();
 
-    // Table and model for the manager list tab
     private JTable managerTable;
     private DefaultTableModel managerModel;
 
@@ -34,9 +35,7 @@ public class AdminDashboard extends JFrame {
         loadManagers();
     }
 
-    // Builds the main layout: top bar + tabbed pane
     private void initUI() {
-        // Top bar with title and logout button
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(new Color(60, 30, 100));
         topBar.setPreferredSize(new Dimension(0, 50));
@@ -46,7 +45,6 @@ public class AdminDashboard extends JFrame {
         lblTitle.setFont(new Font("Arial", Font.BOLD, 14));
         topBar.add(lblTitle, BorderLayout.WEST);
 
-        // Logout button — closes dashboard and opens login screen
         JButton btnLogout = new JButton("Logout");
         btnLogout.setBackground(new Color(180, 50, 50));
         btnLogout.setForeground(Color.WHITE);
@@ -59,69 +57,23 @@ public class AdminDashboard extends JFrame {
         topBar.add(right, BorderLayout.EAST);
         add(topBar, BorderLayout.NORTH);
 
-        // Three tabs: manager list, add manager form, all payments
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Managers",     buildManagersPanel());
         tabs.addTab("Add Manager",  buildAddManagerPanel());
         tabs.addTab("All Payments", buildPaymentsPanel());
+        tabs.addTab("My Profile",   buildMyProfilePanel());
         add(tabs, BorderLayout.CENTER);
     }
 
-    // Handles password reset for the selected manager
-    // Validates: not empty, minimum 8 characters, passwords match
-    private void resetManagerPassword() {
-        int row = managerTable.getSelectedRow();
-        if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Please select a manager.");
-            return;
-        }
-        int managerId = (int) managerModel.getValueAt(row, 0);
-        String name   = (String) managerModel.getValueAt(row, 1);
-
-        JPasswordField txtNew     = new JPasswordField(20);
-        JPasswordField txtConfirm = new JPasswordField(20);
-
-        JPanel panel = new JPanel(new GridLayout(0, 2, 8, 8));
-        panel.add(new JLabel("New Password:"));     panel.add(txtNew);
-        panel.add(new JLabel("Confirm Password:")); panel.add(txtConfirm);
-
-        int result = JOptionPane.showConfirmDialog(this, panel,
-                "Reset Password — " + name, JOptionPane.OK_CANCEL_OPTION);
-        if (result != JOptionPane.OK_OPTION) return;
-
-        String newPass = new String(txtNew.getPassword());
-        String confirm = new String(txtConfirm.getPassword());
-
-        if (newPass.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Password cannot be empty.");
-            return;
-        }
-        if (newPass.length() < 8) {
-            JOptionPane.showMessageDialog(this,
-                    "Password must be at least 8 characters.",
-                    "Validation Error", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        if (!newPass.equals(confirm)) {
-            JOptionPane.showMessageDialog(this, "Passwords do not match.");
-            return;
-        }
-
-        // Delegate to service layer — hashing happens in ManagerService
-        managerService.resetManagerPassword(managerId, newPass);
-        JOptionPane.showMessageDialog(this, "Password reset successfully.");
-    }
-
-    // Builds the Managers tab — table with lock/unlock, delete, reset password actions
+    // Builds the Managers tab — table with lock/unlock, delete actions
+    // Reset Password button removed: managers manage their own passwords
     private JPanel buildManagersPanel() {
         JPanel panel = new JPanel(new BorderLayout());
 
-        // Action buttons toolbar
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JButton btnRefresh   = new JButton("Refresh");
-        JButton btnLock      = new JButton("Lock / Unlock");
-        JButton btnDelete    = new JButton("Delete Manager");
-        JButton btnResetPass = new JButton("Reset Password");
+        JButton btnRefresh = new JButton("Refresh");
+        JButton btnLock    = new JButton("Lock / Unlock");
+        JButton btnDelete  = new JButton("Delete Manager");
 
         btnLock.setBackground(new Color(200, 130, 0));
         btnLock.setForeground(Color.WHITE);
@@ -133,18 +85,12 @@ public class AdminDashboard extends JFrame {
         btnDelete.setOpaque(true);
         btnDelete.setBorderPainted(false);
 
-        btnResetPass.setBackground(new Color(33, 87, 141));
-        btnResetPass.setForeground(Color.WHITE);
-        btnResetPass.setOpaque(true);
-        btnResetPass.setBorderPainted(false);
-
         toolbar.add(btnRefresh);
         toolbar.add(btnLock);
         toolbar.add(btnDelete);
-        toolbar.add(btnResetPass);
         panel.add(toolbar, BorderLayout.NORTH);
 
-        // Non-editable table for displaying manager records
+        // ID kept in model column 0 so action handlers can read it via getValueAt(row, 0)
         String[] cols = {"ID", "Full Name", "Username", "Email", "Role", "Locked", "Created"};
         managerModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
@@ -152,17 +98,16 @@ public class AdminDashboard extends JFrame {
         managerTable = new JTable(managerModel);
         managerTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         managerTable.getTableHeader().setReorderingAllowed(false);
+        managerTable.removeColumn(managerTable.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(managerTable), BorderLayout.CENTER);
 
-        btnRefresh.addActionListener(e   -> loadManagers());
-        btnLock.addActionListener(e      -> toggleLock());
-        btnDelete.addActionListener(e    -> deleteManager());
-        btnResetPass.addActionListener(e -> resetManagerPassword());
+        btnRefresh.addActionListener(e -> loadManagers());
+        btnLock.addActionListener(e    -> toggleLock());
+        btnDelete.addActionListener(e  -> deleteManager());
 
         return panel;
     }
 
-    // Loads all managers from the database and populates the table
     private void loadManagers() {
         managerModel.setRowCount(0);
         for (Manager m : managerService.getAllManagers()) {
@@ -175,21 +120,17 @@ public class AdminDashboard extends JFrame {
         }
     }
 
-    // Toggles the lock status of the selected manager
-    // Admin cannot lock their own account
     private void toggleLock() {
         int row = managerTable.getSelectedRow();
         if (row < 0) { JOptionPane.showMessageDialog(this, "Please select a manager."); return; }
 
         int managerId = (int) managerModel.getValueAt(row, 0);
 
-        // Prevent admin from locking their own account
         if (managerId == admin.getManagerId()) {
             JOptionPane.showMessageDialog(this, "You cannot lock yourself.");
             return;
         }
 
-        // Toggle: if currently Active → lock, if currently LOCKED → unlock
         String lockStatus = (String) managerModel.getValueAt(row, 5);
         boolean newStatus = "Active".equals(lockStatus);
         managerService.setLockStatus(managerId, newStatus);
@@ -198,15 +139,12 @@ public class AdminDashboard extends JFrame {
                 "Manager " + (newStatus ? "locked." : "unlocked."));
     }
 
-    // Deletes the selected manager after confirmation
-    // Admin cannot delete their own account
     private void deleteManager() {
         int row = managerTable.getSelectedRow();
         if (row < 0) { JOptionPane.showMessageDialog(this, "Please select a manager."); return; }
 
         int managerId = (int) managerModel.getValueAt(row, 0);
 
-        // Prevent admin from deleting their own account
         if (managerId == admin.getManagerId()) {
             JOptionPane.showMessageDialog(this, "You cannot delete yourself.");
             return;
@@ -217,13 +155,14 @@ public class AdminDashboard extends JFrame {
                 "Delete manager '" + name + "'?",
                 "Confirm", JOptionPane.YES_NO_OPTION);
         if (confirm == JOptionPane.YES_OPTION) {
-            // Service handles FK cleanup (nullifyManagerEvents) before deletion
             managerService.removeManager(managerId);
             loadManagers();
         }
     }
 
     // Builds the Add Manager tab — form for creating a new manager account
+    // Admin sets the initial password here. After login, the manager can change
+    // their own password from their My Profile tab in ManagerDashboard.
     private JPanel buildAddManagerPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(30, 60, 30, 60));
@@ -237,7 +176,7 @@ public class AdminDashboard extends JFrame {
         JPasswordField txtPass = new JPasswordField(20);
         JComboBox<String> cbRole = new JComboBox<>(new String[]{"MANAGER", "ADMIN"});
 
-        String[] labels    = {"Full Name *", "Username *", "Email *", "Password *", "Role *"};
+        String[] labels    = {"Full Name *", "Username *", "Email *", "Initial Password *", "Role *"};
         Component[] inputs = {txtName, txtUser, txtEmail, txtPass, cbRole};
 
         for (int i = 0; i < inputs.length; i++) {
@@ -247,12 +186,18 @@ public class AdminDashboard extends JFrame {
             panel.add(inputs[i], c);
         }
 
+        JLabel lblHint = new JLabel(
+                "<html><i>Note: The manager can change this password from their profile after first login.</i></html>");
+        lblHint.setForeground(new Color(100, 100, 100));
+        c.gridx = 0; c.gridy = inputs.length; c.gridwidth = 2;
+        panel.add(lblHint, c);
+
         JButton btnSave = new JButton("Add Manager");
         btnSave.setBackground(new Color(60, 30, 100));
         btnSave.setForeground(Color.WHITE);
         btnSave.setOpaque(true);
         btnSave.setBorderPainted(false);
-        c.gridx = 0; c.gridy = inputs.length; c.gridwidth = 2;
+        c.gridy = inputs.length + 1;
         panel.add(btnSave, c);
 
         btnSave.addActionListener(e -> {
@@ -262,9 +207,14 @@ public class AdminDashboard extends JFrame {
             String pass  = new String(txtPass.getPassword());
             String role  = (String) cbRole.getSelectedItem();
 
-            // Validate all required fields are filled
             if (name.isEmpty() || user.isEmpty() || email.isEmpty() || pass.isEmpty()) {
                 JOptionPane.showMessageDialog(panel, "Please fill in all fields.");
+                return;
+            }
+            if (pass.length() < 8) {
+                JOptionPane.showMessageDialog(panel,
+                        "Initial password must be at least 8 characters.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
                 return;
             }
             try {
@@ -274,11 +224,9 @@ public class AdminDashboard extends JFrame {
                 m.setEmail(email);
                 m.setPassword(pass);
                 m.setRole(role);
-                // Service layer handles password hashing before insert
                 managerService.addManager(m);
                 JOptionPane.showMessageDialog(panel, "Manager added successfully!");
                 loadManagers();
-                // Clear form fields after successful add
                 txtName.setText(""); txtUser.setText("");
                 txtEmail.setText(""); txtPass.setText("");
             } catch (Exception ex) {
@@ -291,17 +239,17 @@ public class AdminDashboard extends JFrame {
     }
 
     // Builds the All Payments tab — read-only table showing all payment records
+    // Payment ID hidden in view; Member ID column dropped entirely
     private JPanel buildPaymentsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        String[] cols = {"ID", "Member ID", "Amount", "Date", "Type", "Description", "Status"};
+        String[] cols = {"PaymentID", "Amount", "Date", "Type", "Description", "Status"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
 
-        // Load all payments from service and populate table
         for (Payment p : reportService.getAllPayments()) {
             model.addRow(new Object[]{
-                    p.getPaymentId(), p.getMemberId(),
+                    p.getPaymentId(),
                     String.format("%.2f TL", p.getAmount()),
                     p.getPaymentDate().toLocalDate(),
                     p.getPaymentType(), p.getDescription(), p.getStatus()
@@ -310,7 +258,109 @@ public class AdminDashboard extends JFrame {
 
         JTable table = new JTable(model);
         table.getTableHeader().setReorderingAllowed(false);
+        table.removeColumn(table.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
         return panel;
+    }
+
+    // --- My Profile Tab ---
+    // Admin changes their own password from here.
+    // Same flow as ManagerDashboard's My Profile — current password verified first.
+    // Goes through resetManagerPasswordByEmail since admin is stored in the manager table.
+    private JPanel buildMyProfilePanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(30, 60, 30, 60));
+        GridBagConstraints c = new GridBagConstraints();
+        c.insets = new Insets(8, 8, 8, 8);
+        c.fill = GridBagConstraints.HORIZONTAL;
+
+        JTextField txtName  = readOnly(admin.getFullName());
+        JTextField txtUser  = readOnly(admin.getUsername() != null ? admin.getUsername() : "");
+        JTextField txtEmail = readOnly(admin.getEmail() != null ? admin.getEmail() : "");
+        JTextField txtRole  = readOnly(admin.getRole());
+
+        JPasswordField txtCurrent = new JPasswordField(20);
+        JPasswordField txtNew     = new JPasswordField(20);
+        JPasswordField txtConfirm = new JPasswordField(20);
+
+        String[] labels    = {"Full Name (read-only)", "Username (read-only)",
+                "Email (read-only)", "Role (read-only)",
+                "Current Password", "New Password", "Confirm New Password"};
+        Component[] inputs = {txtName, txtUser, txtEmail, txtRole,
+                txtCurrent, txtNew, txtConfirm};
+
+        for (int i = 0; i < inputs.length; i++) {
+            c.gridx = 0; c.gridy = i; c.weightx = 0.35;
+            panel.add(new JLabel(labels[i] + ":"), c);
+            c.gridx = 1; c.weightx = 0.65;
+            panel.add(inputs[i], c);
+        }
+
+        JButton btnSave = new JButton("Update Password");
+        btnSave.setBackground(new Color(60, 30, 100));
+        btnSave.setForeground(Color.WHITE);
+        btnSave.setOpaque(true);
+        btnSave.setBorderPainted(false);
+        c.gridx = 0; c.gridy = inputs.length; c.gridwidth = 2;
+        panel.add(btnSave, c);
+
+        btnSave.addActionListener(e -> {
+            String current = new String(txtCurrent.getPassword());
+            String pass    = new String(txtNew.getPassword());
+            String confirm = new String(txtConfirm.getPassword());
+
+            if (current.isEmpty() || pass.isEmpty() || confirm.isEmpty()) {
+                JOptionPane.showMessageDialog(panel, "Please fill in all password fields.");
+                return;
+            }
+            if (pass.length() < 8) {
+                JOptionPane.showMessageDialog(panel,
+                        "New password must be at least 8 characters.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            if (!pass.equals(confirm)) {
+                JOptionPane.showMessageDialog(panel, "New passwords do not match.");
+                return;
+            }
+            if (pass.equals(current)) {
+                JOptionPane.showMessageDialog(panel,
+                        "New password cannot be the same as your current password.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Verify current password before applying the change
+            if (!authService.verifyManagerPassword(admin.getManagerId(), current)) {
+                JOptionPane.showMessageDialog(panel,
+                        "Current password is incorrect.",
+                        "Authentication Failed", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Apply via service — handles BCrypt hashing + lock clearing
+            AuthService.ResetResult result =
+                    authService.resetManagerPasswordByEmail(admin.getEmail(), pass);
+            if (result == AuthService.ResetResult.SUCCESS) {
+                JOptionPane.showMessageDialog(panel, "Password updated successfully.");
+                txtCurrent.setText("");
+                txtNew.setText("");
+                txtConfirm.setText("");
+            } else {
+                JOptionPane.showMessageDialog(panel,
+                        "Could not update password. Please try again.",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        return panel;
+    }
+
+    // Helper: creates a non-editable text field with grey background
+    private JTextField readOnly(String value) {
+        JTextField field = new JTextField(value);
+        field.setEditable(false);
+        field.setBackground(new Color(240, 240, 240));
+        return field;
     }
 }
