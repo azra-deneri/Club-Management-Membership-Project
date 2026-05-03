@@ -4,6 +4,7 @@ import com.iscms.dao.*;
 import com.iscms.model.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +17,10 @@ public class PTService {
     private final TrainerDAO trainerDAO;
     private final MemberDAO memberDAO;
     private final MembershipDAO membershipDAO;
+
+    // Grace period after appointment end before trainer can mark as NO_SHOW
+    // Gives the member a reasonable window to arrive late without being penalized
+    private static final long NO_SHOW_GRACE_HOURS = 1;
 
     // Default constructor — creates concrete DAO implementations
     public PTService() {
@@ -36,6 +41,7 @@ public class PTService {
 
     // Books a PT appointment for a member with a trainer
     // Enforces all PT business rules in order:
+    // 0. Time validity: end time must be strictly after start time
     // 1. Member must have an active membership
     // 2. CLASSIC tier cannot book PT sessions
     // 3. Monthly session limit: GOLD = 2, VIP = 4
@@ -44,6 +50,13 @@ public class PTService {
     // 6. Member must not have a conflicting appointment at the same time
     public void bookAppointment(int memberId, int trainerId,
                                 LocalDate date, LocalTime start, LocalTime end) {
+
+        // Check 0: end time must be strictly after start time
+        if (start == null || end == null)
+            throw new IllegalArgumentException("Start and end time are required.");
+        if (!end.isAfter(start))
+            throw new IllegalArgumentException(
+                    "End time (" + end + ") must be after start time (" + start + ").");
 
         // Check 1: active membership required
         Membership ms = membershipDAO.findActiveByMemberId(memberId)
@@ -86,27 +99,83 @@ public class PTService {
         appointmentDAO.insert(apt);
     }
 
-    // Cancels a PT appointment
-    // Cannot cancel an appointment that has already passed
+    // Cancels a PT appointment.
+    // Two preconditions:
+    //   - Status must be SCHEDULED — already-cancelled, completed, or no-show
+    //     appointments cannot be re-cancelled.
+    //   - Appointment must not have started yet — once the session begins,
+    //     it's too late to cancel.
     public void cancelAppointment(int appointmentId) {
         PersonalTrainingAppointment apt = appointmentDAO.findById(appointmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Appointment not found."));
 
-        // Appointment date must be in the future
-        if (!apt.getAppointmentDate().isAfter(LocalDate.now()))
-            throw new IllegalStateException("Cannot cancel a past appointment.");
+        // Status guard — only SCHEDULED appointments can transition to CANCELLED
+        if (!"SCHEDULED".equals(apt.getStatus()))
+            throw new IllegalStateException(
+                    "Cannot cancel an appointment that is already " + apt.getStatus() + ".");
+
+        // Time guard — block cancellation if the appointment has already started
+        LocalDateTime startsAt = LocalDateTime.of(apt.getAppointmentDate(), apt.getStartTime());
+        if (!LocalDateTime.now().isBefore(startsAt))
+            throw new IllegalStateException(
+                    "This appointment has already started or passed and cannot be cancelled.");
 
         appointmentDAO.updateStatus(appointmentId, "CANCELLED");
     }
 
-    // Marks an appointment as COMPLETED — called by trainer after the session
+    // Marks an appointment as COMPLETED — called by trainer after the session.
+    // Two preconditions:
+    //   - Status must be SCHEDULED — cancelled / already-completed / no-show
+    //     appointments cannot be re-marked.
+    //   - Appointment must have started — a session that hasn't begun yet
+    //     has nothing to complete.
     public void markCompleted(int appointmentId) {
+        PersonalTrainingAppointment apt = appointmentDAO.findById(appointmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Appointment not found."));
+
+        // Status guard
+        if (!"SCHEDULED".equals(apt.getStatus()))
+            throw new IllegalStateException(
+                    "Cannot mark this appointment as completed — it is " + apt.getStatus() + ".");
+
+        // Time guard — block if appointment hasn't started yet
+        LocalDateTime startsAt = LocalDateTime.of(apt.getAppointmentDate(), apt.getStartTime());
+        if (LocalDateTime.now().isBefore(startsAt))
+            throw new IllegalStateException(
+                    "Cannot mark a future appointment as completed. "
+                            + "The session must have started first.");
+
         appointmentDAO.updateStatus(appointmentId, "COMPLETED");
     }
 
-    // Marks an appointment as NO_SHOW and applies a 7-day booking penalty
-    // The penalty blocks the member from booking new PT sessions for 7 days
+    // Marks an appointment as NO_SHOW and applies a 7-day booking penalty.
+    // The penalty blocks the member from booking new PT sessions for 7 days.
+    //
+    // Two preconditions:
+    //   - Status must be SCHEDULED — cancelled / completed / already-no-show
+    //     appointments cannot be re-marked.
+    //   - At least NO_SHOW_GRACE_HOURS (1 hour) must have passed since the
+    //     appointment's end time. This prevents trainers from penalizing members
+    //     for future sessions, and gives members a reasonable late-arrival window.
     public void markNoShow(int appointmentId) {
+        PersonalTrainingAppointment apt = appointmentDAO.findById(appointmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Appointment not found."));
+
+        // Status guard
+        if (!"SCHEDULED".equals(apt.getStatus()))
+            throw new IllegalStateException(
+                    "Cannot mark this appointment as no-show — it is " + apt.getStatus() + ".");
+
+        // Time guard — must wait until grace period after appointment end has passed
+        LocalDateTime canMarkAfter = LocalDateTime
+                .of(apt.getAppointmentDate(), apt.getEndTime())
+                .plusHours(NO_SHOW_GRACE_HOURS);
+
+        if (LocalDateTime.now().isBefore(canMarkAfter))
+            throw new IllegalStateException(
+                    "Cannot mark no-show yet. You can mark this appointment as no-show "
+                            + "after " + canMarkAfter + " (1 hour after the session ends).");
+
         appointmentDAO.updateStatus(appointmentId, "NO_SHOW");
         appointmentDAO.updateNoShowPenalty(appointmentId, LocalDate.now().plusDays(7));
     }
@@ -165,10 +234,19 @@ public class PTService {
     }
 
     // Saves lesson slots for a trainer using delete + insert pattern
-    // Validates: no duplicate slots, all slots within working hours
+    // Validates: end > start for each slot, no duplicate slots, all slots within working hours
     public void saveLessonSlots(int trainerId, List<TrainerLessonSlot> slots) {
 
-        // Check for duplicate slots (same day + same time)
+        for (TrainerLessonSlot slot : slots) {
+            if (slot.getStartTime() == null || slot.getEndTime() == null)
+                throw new IllegalArgumentException(
+                        slot.getDayOfWeek() + ": Start and end time are required.");
+            if (!slot.getEndTime().isAfter(slot.getStartTime()))
+                throw new IllegalArgumentException(
+                        slot.getDayOfWeek() + " " + slot.getStartTime()
+                                + ": End time must be after start time.");
+        }
+
         for (int i = 0; i < slots.size(); i++) {
             for (int j = i + 1; j < slots.size(); j++) {
                 TrainerLessonSlot a = slots.get(i);
@@ -181,7 +259,6 @@ public class PTService {
             }
         }
 
-        // Check that each slot falls within the trainer's working hours for that day
         List<TrainerWorkingDay> workingDays = trainerDAO.findWorkingDays(trainerId);
         for (TrainerLessonSlot slot : slots) {
             TrainerWorkingDay wd = workingDays.stream()
@@ -210,7 +287,6 @@ public class PTService {
     }
 
     // Activates or deactivates a trainer
-    // Deactivated trainers cannot receive new PT appointments
     public void setTrainerActive(int trainerId, boolean active) {
         trainerDAO.updateActive(trainerId, active);
     }
@@ -221,7 +297,6 @@ public class PTService {
     }
 
     // Checks whether a trainer's slot is already taken on a given date and time
-    // Used by PTPanel to display slot availability in the UI
     public boolean isSlotTaken(int trainerId, LocalDate date, LocalTime start, LocalTime end) {
         return appointmentDAO.isSlotTaken(trainerId, date, start, end);
     }

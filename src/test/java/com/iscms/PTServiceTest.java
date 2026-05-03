@@ -1,6 +1,9 @@
 package com.iscms;
 
-import com.iscms.dao.*;
+import com.iscms.dao.AppointmentDAO;
+import com.iscms.dao.MemberDAO;
+import com.iscms.dao.MembershipDAO;
+import com.iscms.dao.TrainerDAO;
 import com.iscms.model.*;
 import com.iscms.service.PTService;
 
@@ -16,14 +19,16 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
-// Unit tests for PTService — covers appointment booking, cancellation, no-show, and trainer management
-// Uses Mockito to mock DAO interfaces — no real DB calls
+// Unit tests for PTService — covers booking, cancellation, lifecycle, and trainer ops.
+// Batch 1 added time/status guards to cancelAppointment, markCompleted, markNoShow,
+// so tests for those three methods now mock findById and supply realistic appointment
+// shapes (status=SCHEDULED + time relationship that satisfies the guard).
 @ExtendWith(MockitoExtension.class)
 public class PTServiceTest {
 
-    // Mocked DAO interfaces — injected into PTService via constructor
     @Mock private AppointmentDAO appointmentDAO;
     @Mock private TrainerDAO trainerDAO;
     @Mock private MemberDAO memberDAO;
@@ -38,7 +43,6 @@ public class PTServiceTest {
 
     // --- Booking Tests ---
 
-    // No active membership — booking must be blocked
     @Test
     void bookAppointment_noActiveMembership_throwsException() {
         when(membershipDAO.findActiveByMemberId(1)).thenReturn(Optional.empty());
@@ -48,7 +52,6 @@ public class PTServiceTest {
                         LocalTime.of(10, 0), LocalTime.of(11, 0)));
     }
 
-    // CLASSIC tier cannot book PT sessions
     @Test
     void bookAppointment_classicMember_throwsException() {
         Membership ms = buildMembership("CLASSIC");
@@ -60,42 +63,39 @@ public class PTServiceTest {
                         LocalTime.of(10, 0), LocalTime.of(11, 0)));
     }
 
-    // GOLD tier monthly limit is 2 — exceeding it must throw
     @Test
     void bookAppointment_goldExceedsMonthlyLimit_throwsException() {
         Membership ms = buildMembership("GOLD");
         LocalDate date = LocalDate.now().plusDays(1);
         when(membershipDAO.findActiveByMemberId(1)).thenReturn(Optional.of(ms));
         when(appointmentDAO.countMonthlyAppointments(1,
-                date.getYear(), date.getMonthValue())).thenReturn(2); // at limit
+                date.getYear(), date.getMonthValue())).thenReturn(2);
 
         assertThrows(IllegalStateException.class,
                 () -> ptService.bookAppointment(1, 1, date,
                         LocalTime.of(10, 0), LocalTime.of(11, 0)));
     }
 
-    // VIP tier monthly limit is 4 — exceeding it must throw
     @Test
     void bookAppointment_vipExceedsMonthlyLimit_throwsException() {
         Membership ms = buildMembership("VIP");
         LocalDate date = LocalDate.now().plusDays(1);
         when(membershipDAO.findActiveByMemberId(1)).thenReturn(Optional.of(ms));
         when(appointmentDAO.countMonthlyAppointments(1,
-                date.getYear(), date.getMonthValue())).thenReturn(4); // at limit
+                date.getYear(), date.getMonthValue())).thenReturn(4);
 
         assertThrows(IllegalStateException.class,
                 () -> ptService.bookAppointment(1, 1, date,
                         LocalTime.of(10, 0), LocalTime.of(11, 0)));
     }
 
-    // VIP under monthly limit (3 of 4 used) — booking must succeed
     @Test
     void bookAppointment_vipUnderLimit_success() {
         Membership ms = buildMembership("VIP");
         LocalDate date = LocalDate.now().plusDays(1);
         when(membershipDAO.findActiveByMemberId(1)).thenReturn(Optional.of(ms));
         when(appointmentDAO.countMonthlyAppointments(1,
-                date.getYear(), date.getMonthValue())).thenReturn(3); // 3 of 4 used
+                date.getYear(), date.getMonthValue())).thenReturn(3);
         when(appointmentDAO.findActiveNoShowPenalty(1)).thenReturn(Optional.empty());
         when(appointmentDAO.isSlotTaken(anyInt(), any(), any(), any())).thenReturn(false);
         when(appointmentDAO.hasMemberConflict(anyInt(), any(), any(), any())).thenReturn(false);
@@ -105,7 +105,6 @@ public class PTServiceTest {
         verify(appointmentDAO).insert(any());
     }
 
-    // Active no-show penalty blocks new bookings for 7 days
     @Test
     void bookAppointment_activeNoShowPenalty_throwsException() {
         Membership ms = buildMembership("GOLD");
@@ -114,14 +113,13 @@ public class PTServiceTest {
         when(appointmentDAO.countMonthlyAppointments(1,
                 date.getYear(), date.getMonthValue())).thenReturn(0);
         when(appointmentDAO.findActiveNoShowPenalty(1))
-                .thenReturn(Optional.of(LocalDate.now().plusDays(3))); // penalty active
+                .thenReturn(Optional.of(LocalDate.now().plusDays(3)));
 
         assertThrows(IllegalStateException.class,
                 () -> ptService.bookAppointment(1, 1, date,
                         LocalTime.of(10, 0), LocalTime.of(11, 0)));
     }
 
-    // Trainer slot already booked by another member — must throw
     @Test
     void bookAppointment_slotAlreadyTaken_throwsException() {
         Membership ms = buildMembership("GOLD");
@@ -137,7 +135,6 @@ public class PTServiceTest {
                         LocalTime.of(10, 0), LocalTime.of(11, 0)));
     }
 
-    // Member already has an overlapping appointment at the same time — must throw
     @Test
     void bookAppointment_memberConflict_throwsException() {
         Membership ms = buildMembership("GOLD");
@@ -154,55 +151,156 @@ public class PTServiceTest {
                         LocalTime.of(10, 0), LocalTime.of(11, 0)));
     }
 
-    // --- Cancellation Tests ---
+    // Booking with end ≤ start must be rejected before any DB call (Batch 1)
+    @Test
+    void bookAppointment_endBeforeStart_throwsException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ptService.bookAppointment(1, 1,
+                        LocalDate.now().plusDays(1),
+                        LocalTime.of(11, 0), LocalTime.of(10, 0))); // reversed
+    }
 
-    // Past appointment cannot be cancelled
+    // --- Cancellation Tests ---
+    // Batch 1: cancelAppointment now requires status=SCHEDULED and refuses past-start times.
+
+    // Already-started appointment (yesterday) cannot be cancelled
     @Test
     void cancelAppointment_pastAppointment_throwsException() {
-        PersonalTrainingAppointment apt = new PersonalTrainingAppointment();
-        apt.setAppointmentId(1);
-        apt.setAppointmentDate(LocalDate.now().minusDays(1)); // yesterday
-        apt.setStatus("SCHEDULED");
+        PersonalTrainingAppointment apt = buildAppointment(
+                LocalDate.now().minusDays(1),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                "SCHEDULED");
         when(appointmentDAO.findById(1)).thenReturn(Optional.of(apt));
 
         assertThrows(IllegalStateException.class,
                 () -> ptService.cancelAppointment(1));
     }
 
-    // Future appointment can be cancelled — must call updateStatus(CANCELLED)
+    // Future appointment with status=SCHEDULED is cancellable
     @Test
     void cancelAppointment_futureAppointment_success() {
-        PersonalTrainingAppointment apt = new PersonalTrainingAppointment();
-        apt.setAppointmentId(1);
-        apt.setAppointmentDate(LocalDate.now().plusDays(2));
-        apt.setStatus("SCHEDULED");
+        PersonalTrainingAppointment apt = buildAppointment(
+                LocalDate.now().plusDays(2),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                "SCHEDULED");
         when(appointmentDAO.findById(1)).thenReturn(Optional.of(apt));
 
         assertDoesNotThrow(() -> ptService.cancelAppointment(1));
         verify(appointmentDAO).updateStatus(1, "CANCELLED");
     }
 
-    // --- No-Show and Complete Tests ---
+    // Cancelled appointment cannot be cancelled again — status guard fires (Batch 1)
+    @Test
+    void cancelAppointment_alreadyCancelled_throwsException() {
+        PersonalTrainingAppointment apt = buildAppointment(
+                LocalDate.now().plusDays(2),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                "CANCELLED");
+        when(appointmentDAO.findById(1)).thenReturn(Optional.of(apt));
 
-    // markNoShow must set status to NO_SHOW and apply 7-day booking penalty
+        assertThrows(IllegalStateException.class,
+                () -> ptService.cancelAppointment(1));
+    }
+
+    // --- No-Show and Complete Tests ---
+    // Batch 1: both methods now require status=SCHEDULED and have time guards.
+    //   markCompleted: appointment must have started
+    //   markNoShow: appointment end + 1-hour grace must have passed
+
+    // markNoShow on a finished appointment (status=SCHEDULED, end > 1h ago) must succeed
     @Test
     void markNoShow_setsStatusAndPenalty() {
+        // Yesterday 10:00–11:00 — well past the 1-hour grace window
+        PersonalTrainingAppointment apt = buildAppointment(
+                LocalDate.now().minusDays(1),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                "SCHEDULED");
+        when(appointmentDAO.findById(1)).thenReturn(Optional.of(apt));
+
         ptService.markNoShow(1);
+
         verify(appointmentDAO).updateStatus(1, "NO_SHOW");
         verify(appointmentDAO).updateNoShowPenalty(eq(1),
                 eq(LocalDate.now().plusDays(7)));
     }
 
-    // markCompleted must set status to COMPLETED
+    // markNoShow on a future appointment must throw — grace period not yet elapsed
+    @Test
+    void markNoShow_futureAppointment_throwsException() {
+        PersonalTrainingAppointment apt = buildAppointment(
+                LocalDate.now().plusDays(2),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                "SCHEDULED");
+        when(appointmentDAO.findById(1)).thenReturn(Optional.of(apt));
+
+        assertThrows(IllegalStateException.class,
+                () -> ptService.markNoShow(1));
+    }
+
+    // markNoShow on a cancelled appointment must throw — status guard fires
+    @Test
+    void markNoShow_alreadyCancelled_throwsException() {
+        PersonalTrainingAppointment apt = buildAppointment(
+                LocalDate.now().minusDays(1),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                "CANCELLED");
+        when(appointmentDAO.findById(1)).thenReturn(Optional.of(apt));
+
+        assertThrows(IllegalStateException.class,
+                () -> ptService.markNoShow(1));
+    }
+
+    // markCompleted on a started appointment (yesterday) must succeed
     @Test
     void markCompleted_setsStatusCompleted() {
+        PersonalTrainingAppointment apt = buildAppointment(
+                LocalDate.now().minusDays(1),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                "SCHEDULED");
+        when(appointmentDAO.findById(1)).thenReturn(Optional.of(apt));
+
         ptService.markCompleted(1);
+
         verify(appointmentDAO).updateStatus(1, "COMPLETED");
+    }
+
+    // markCompleted on a future appointment must throw — session hasn't started
+    @Test
+    void markCompleted_futureAppointment_throwsException() {
+        PersonalTrainingAppointment apt = buildAppointment(
+                LocalDate.now().plusDays(2),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                "SCHEDULED");
+        when(appointmentDAO.findById(1)).thenReturn(Optional.of(apt));
+
+        assertThrows(IllegalStateException.class,
+                () -> ptService.markCompleted(1));
+    }
+
+    // markCompleted on a cancelled appointment must throw — status guard fires
+    @Test
+    void markCompleted_alreadyCancelled_throwsException() {
+        PersonalTrainingAppointment apt = buildAppointment(
+                LocalDate.now().minusDays(1),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                "CANCELLED");
+        when(appointmentDAO.findById(1)).thenReturn(Optional.of(apt));
+
+        assertThrows(IllegalStateException.class,
+                () -> ptService.markCompleted(1));
     }
 
     // --- Trainer Management Tests ---
 
-    // addTrainer must hash the plain text password before calling DAO insert
     @Test
     void addTrainer_hashesPasswordAndCallsInsert() {
         Trainer t = new Trainer();
@@ -219,7 +317,6 @@ public class PTServiceTest {
         ));
     }
 
-    // saveWorkingDays with valid days — must call trainerDAO.saveWorkingDays()
     @Test
     void saveWorkingDays_callsDAO() {
         List<TrainerWorkingDay> days = List.of(buildWorkingDay("MONDAY"));
@@ -227,20 +324,18 @@ public class PTServiceTest {
         verify(trainerDAO).saveWorkingDays(1, days);
     }
 
-    // saveWorkingDays with end before start — must throw IllegalArgumentException
     @Test
     void saveWorkingDays_endBeforeStart_throwsException() {
         TrainerWorkingDay wd = new TrainerWorkingDay();
         wd.setTrainerId(1);
         wd.setDayOfWeek("MONDAY");
         wd.setStartTime(LocalTime.of(18, 0));
-        wd.setEndTime(LocalTime.of(9, 0)); // end before start
+        wd.setEndTime(LocalTime.of(9, 0));
 
         assertThrows(IllegalArgumentException.class,
                 () -> ptService.saveWorkingDays(1, List.of(wd)));
     }
 
-    // saveLessonSlots with valid slot within working hours — must call DAO
     @Test
     void saveLessonSlots_callsDAO() {
         TrainerWorkingDay wd = new TrainerWorkingDay();
@@ -254,7 +349,6 @@ public class PTServiceTest {
         verify(trainerDAO).saveLessonSlots(1, slots);
     }
 
-    // saveLessonSlots with duplicate slot — duplicate check runs before working hours check
     @Test
     void saveLessonSlots_duplicateSlot_throwsException() {
         TrainerLessonSlot slot1 = new TrainerLessonSlot();
@@ -265,14 +359,12 @@ public class PTServiceTest {
         TrainerLessonSlot slot2 = new TrainerLessonSlot();
         slot2.setDayOfWeek("MONDAY");
         slot2.setStartTime(LocalTime.of(9, 0));
-        slot2.setEndTime(LocalTime.of(10, 0)); // exact duplicate
+        slot2.setEndTime(LocalTime.of(10, 0));
 
-        // No mock needed — duplicate check fires before working hours check
         assertThrows(IllegalArgumentException.class,
                 () -> ptService.saveLessonSlots(1, List.of(slot1, slot2)));
     }
 
-    // saveLessonSlots with slot outside working hours — must throw
     @Test
     void saveLessonSlots_outsideWorkingHours_throwsException() {
         TrainerWorkingDay wd = new TrainerWorkingDay();
@@ -283,14 +375,13 @@ public class PTServiceTest {
 
         TrainerLessonSlot slot = new TrainerLessonSlot();
         slot.setDayOfWeek("MONDAY");
-        slot.setStartTime(LocalTime.of(7, 0)); // before working hours start
+        slot.setStartTime(LocalTime.of(7, 0));
         slot.setEndTime(LocalTime.of(8, 0));
 
         assertThrows(IllegalArgumentException.class,
                 () -> ptService.saveLessonSlots(1, List.of(slot)));
     }
 
-    // resetTrainerPassword must hash the new password before calling updatePassword
     @Test
     void resetTrainerPassword_hashesAndCallsDAO() {
         ptService.resetTrainerPassword(1, "newpassword");
@@ -298,14 +389,12 @@ public class PTServiceTest {
                 argThat(hash -> hash.startsWith("$2a$")));
     }
 
-    // setTrainerActive must call trainerDAO.updateActive() with correct arguments
     @Test
     void setTrainerActive_callsDAO() {
         ptService.setTrainerActive(1, false);
         verify(trainerDAO).updateActive(1, false);
     }
 
-    // unlockTrainer must call trainerDAO.updateLockStatus(false)
     @Test
     void unlockTrainer_callsDAO() {
         ptService.unlockTrainer(1);
@@ -314,7 +403,6 @@ public class PTServiceTest {
 
     // --- Helper Methods ---
 
-    // Builds a Membership test object with the given tier
     private Membership buildMembership(String tier) {
         Membership ms = new Membership();
         ms.setMembershipId(1);
@@ -328,7 +416,6 @@ public class PTServiceTest {
         return ms;
     }
 
-    // Builds a TrainerWorkingDay test object for the given day
     private TrainerWorkingDay buildWorkingDay(String day) {
         TrainerWorkingDay wd = new TrainerWorkingDay();
         wd.setTrainerId(1);
@@ -338,7 +425,6 @@ public class PTServiceTest {
         return wd;
     }
 
-    // Builds a TrainerLessonSlot test object for the given day
     private TrainerLessonSlot buildLessonSlot(String day) {
         TrainerLessonSlot slot = new TrainerLessonSlot();
         slot.setTrainerId(1);
@@ -346,5 +432,22 @@ public class PTServiceTest {
         slot.setStartTime(LocalTime.of(9, 0));
         slot.setEndTime(LocalTime.of(10, 0));
         return slot;
+    }
+
+    // Builds a PersonalTrainingAppointment with all the fields required by Batch 1
+    // time/status guards. Used by cancel/markCompleted/markNoShow tests.
+    private PersonalTrainingAppointment buildAppointment(LocalDate date,
+                                                         LocalTime start,
+                                                         LocalTime end,
+                                                         String status) {
+        PersonalTrainingAppointment apt = new PersonalTrainingAppointment();
+        apt.setAppointmentId(1);
+        apt.setMemberId(1);
+        apt.setTrainerId(1);
+        apt.setAppointmentDate(date);
+        apt.setStartTime(start);
+        apt.setEndTime(end);
+        apt.setStatus(status);
+        return apt;
     }
 }
