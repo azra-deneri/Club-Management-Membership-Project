@@ -68,7 +68,7 @@ public class EventBuilder {
             throw new IllegalStateException("End time must be after start time.");
 
         // Event name and date are required fields
-        if (event.getEventName() == null || event.getEventDate() == null)
+        if (event.getEventName() == null || event.getEventName().trim().isEmpty() || event.getEventDate() == null)
             throw new IllegalStateException("Event name and date are required.");
 
         // Capacity must be a positive number

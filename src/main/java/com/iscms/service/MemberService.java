@@ -3,41 +3,60 @@ package com.iscms.service;
 import com.iscms.dao.*;
 import com.iscms.model.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-// Service class responsible for all member-related business operations
-// Handles registration, approval, tier upgrades, freezing, profile updates, and BMI
+// Service class responsible for all member-related business operations.
+//
+// Batch 4 additions:
+//   - InstallmentDAO injection for the ANNUAL_INSTALLMENT schedule lifecycle
+//   - Cancellation flow (cancelMembership, deleteAccountSelf, deleteAccountByManager)
+//   - Auto-delete sweep (expireOldPassiveMembers)
+//   - Installment creation, payment, and overdue detection
+//
+// Two parallel registration flows still exist:
+//   1. Cash flow:    user/manager submits → manager approves → ACTIVE
+//   2. Online flow:  user pays directly via mock card → ACTIVE immediately
+// ANNUAL_INSTALLMENT is online-only — the cash path's UI removes it from the package list.
 public class MemberService {
 
     private final MemberDAO memberDAO;
     private final MembershipDAO membershipDAO;
     private final RequestDAO requestDAO;
     private final PaymentDAO paymentDAO;
+    private final InstallmentDAO installmentDAO;
 
-    // Default constructor — creates concrete DAO implementations
+    // PASSIVE members are auto-deleted after this many days. 365 = 1 year.
+    private static final int PASSIVE_AUTO_DELETE_DAYS = 365;
+
+    // Number of monthly installments in an ANNUAL_INSTALLMENT schedule
+    private static final int INSTALLMENT_COUNT = 12;
+
     public MemberService() {
-        this.memberDAO     = new MemberDAOImpl();
-        this.membershipDAO = new MembershipDAOImpl();
-        this.requestDAO    = new RequestDAOImpl();
-        this.paymentDAO    = new PaymentDAOImpl();
+        this.memberDAO       = new MemberDAOImpl();
+        this.membershipDAO   = new MembershipDAOImpl();
+        this.requestDAO      = new RequestDAOImpl();
+        this.paymentDAO      = new PaymentDAOImpl();
+        this.installmentDAO  = new InstallmentDAOImpl();
     }
 
-    // Constructor for unit testing — allows injecting mock DAO objects
     public MemberService(MemberDAO memberDAO, MembershipDAO membershipDAO,
-                         RequestDAO requestDAO, PaymentDAO paymentDAO) {
-        this.memberDAO     = memberDAO;
-        this.membershipDAO = membershipDAO;
-        this.requestDAO    = requestDAO;
-        this.paymentDAO    = paymentDAO;
+                         RequestDAO requestDAO, PaymentDAO paymentDAO,
+                         InstallmentDAO installmentDAO) {
+        this.memberDAO       = memberDAO;
+        this.membershipDAO   = membershipDAO;
+        this.requestDAO      = requestDAO;
+        this.paymentDAO      = paymentDAO;
+        this.installmentDAO  = installmentDAO;
     }
 
-    // Creates a new member record with PENDING status and a registration request
-    // Used when a member self-registers through the registration form (UC-M02)
-    // Password is hashed before saving if not already hashed
+    // === Cash flow — manager approval required ===
+
     public void createRegistrationRequest(Member member, String tier, String packageType) {
         validateMember(member);
         if (!member.getPassword().startsWith("$2a$"))
@@ -45,7 +64,6 @@ public class MemberService {
         member.setStatus("PENDING");
         memberDAO.insert(member);
 
-        // Re-fetch to get the auto-generated member_id from DB
         Member saved = memberDAO.findByPhone(member.getPhone())
                 .orElseThrow(() -> new IllegalStateException("Member not found after insert: " + member.getPhone()));
 
@@ -54,13 +72,10 @@ public class MemberService {
         req.setTier(tier);
         req.setPackageType(packageType);
         req.setAmount(calculateAmount(tier, packageType));
-        // Request expires in 3 days if not approved
         req.setExpiresAt(LocalDateTime.now().plusDays(3));
         requestDAO.insertRegistration(req);
     }
 
-    // Creates a renewal request for an existing member
-    // Used when a PASSIVE member wants to renew their membership (UC-M08)
     public void createRenewalRequest(int memberId, String tier, String packageType) {
         RegistrationRequest req = new RegistrationRequest();
         req.setMemberId(memberId);
@@ -72,8 +87,8 @@ public class MemberService {
         requestDAO.insertRegistration(req);
     }
 
-    // Registers a member directly without approval flow — used by manager (UC-A02)
-    // Creates member, membership, and payment records in one operation
+    // Cash flow: manager registers a member directly. Goes straight to ACTIVE.
+    // ANNUAL_INSTALLMENT is intentionally not supported via this path (UI hides it).
     public void registerMember(Member member, String tier, String packageType, int managerId) {
         validateMember(member);
         if (!member.getPassword().startsWith("$2a$"))
@@ -81,33 +96,14 @@ public class MemberService {
         member.setStatus("ACTIVE");
         memberDAO.insert(member);
 
-        // Re-fetch to get the auto-generated member_id from DB
         Member saved = memberDAO.findByPhone(member.getPhone())
                 .orElseThrow(() -> new IllegalStateException("Member not found after insert: " + member.getPhone()));
 
-        Membership ms = new Membership();
-        ms.setMemberId(saved.getMemberId());
-        ms.setTier(tier);
-        ms.setPackageType(packageType);
-        ms.setStartDate(LocalDate.now());
-        ms.setEndDate(calcEndDate(packageType));
-        ms.setStatus("ACTIVE");
-        ms.setFreezeCount(0);
-        membershipDAO.insert(ms);
-
-        Payment payment = new Payment();
-        payment.setMemberId(saved.getMemberId());
-        payment.setAmount(calculateAmount(tier, packageType));
-        payment.setPaymentType("MEMBERSHIP");
-        payment.setDescription(tier + " - " + packageType);
-        payment.setStatus("PAID");
-        payment.setRecordedBy(managerId);
-        paymentDAO.insert(payment);
+        Membership ms = createMembership(saved.getMemberId(), tier, packageType);
+        recordMembershipPayment(saved.getMemberId(), tier, packageType,
+                calculateAmount(tier, packageType), managerId, "CASH", null);
     }
 
-    // Approves a pending registration or renewal request
-    // For RENEWAL: old ACTIVE membership is set to PASSIVE BEFORE new one is inserted
-    // This prevents the new membership from being accidentally set to PASSIVE
     public void approveRegistration(int requestId, int recordedBy) {
         List<RegistrationRequest> reqs = requestDAO.findPendingRegistrations();
         RegistrationRequest req = reqs.stream()
@@ -117,39 +113,21 @@ public class MemberService {
 
         requestDAO.updateRegistrationStatus(requestId, "APPROVED");
         memberDAO.updateStatus(req.getMemberId(), "ACTIVE");
+        // Renewing — clear PASSIVE-state markers if present
+        memberDAO.setPassiveSince(req.getMemberId(), null);
+        memberDAO.clearCancellationRequested(req.getMemberId());
 
-        // FIX: For RENEWAL — set old ACTIVE memberships to PASSIVE BEFORE inserting new one
-        // If done after insert, the new membership would also be caught by the filter and set to PASSIVE
         if ("RENEWAL".equals(req.getType())) {
             membershipDAO.findAllByMemberId(req.getMemberId()).stream()
                     .filter(m -> "ACTIVE".equals(m.getStatus()))
                     .forEach(m -> membershipDAO.updateStatus(m.getMembershipId(), "PASSIVE"));
         }
 
-        // Insert new membership AFTER old ones are passivated
-        Membership ms = new Membership();
-        ms.setMemberId(req.getMemberId());
-        ms.setTier(req.getTier());
-        ms.setPackageType(req.getPackageType());
-        ms.setStartDate(LocalDate.now());
-        ms.setEndDate(calcEndDate(req.getPackageType()));
-        ms.setStatus("ACTIVE");
-        ms.setFreezeCount(0);
-        membershipDAO.insert(ms);
-
-        Payment payment = new Payment();
-        payment.setMemberId(req.getMemberId());
-        payment.setAmount(req.getAmount());
-        payment.setPaymentType("MEMBERSHIP");
-        payment.setDescription(req.getTier() + " - " + req.getPackageType());
-        payment.setStatus("PAID");
-        payment.setRecordedBy(recordedBy);
-        paymentDAO.insert(payment);
+        Membership ms = createMembership(req.getMemberId(), req.getTier(), req.getPackageType());
+        recordMembershipPayment(req.getMemberId(), req.getTier(), req.getPackageType(),
+                req.getAmount(), recordedBy, "CASH", null);
     }
 
-    // Rejects a pending registration request
-    // For RENEWAL: only status is updated to REJECTED — member record is kept
-    // For INITIAL: request and member record are both deleted (registration failed)
     public void rejectRegistration(int requestId) {
         List<RegistrationRequest> reqs = requestDAO.findPendingRegistrations();
         reqs.stream()
@@ -165,10 +143,6 @@ public class MemberService {
                 });
     }
 
-    // Expires all pending requests that have passed their expiry timestamp
-    // For INITIAL registrations: deletes the request and the member record
-    // For RENEWAL registrations: only marks as EXPIRED (member record kept)
-    // Also expires all pending tier upgrade requests
     public void expireOldRequests() {
         List<RegistrationRequest> pending = requestDAO.findPendingRegistrations();
         pending.stream()
@@ -187,11 +161,8 @@ public class MemberService {
                 .forEach(r -> requestDAO.updateTierUpgradeStatus(r.getRequestId(), "EXPIRED"));
     }
 
-    // Creates a tier upgrade request for a member
-    // Member must have an active membership to request an upgrade
     public void createTierUpgradeRequest(int memberId, int membershipId,
-                                         String oldTier, String newTier,
-                                         String packageType, double fee) {
+                                         String oldTier, String newTier, double fee) {
         Optional<Membership> ms = membershipDAO.findActiveByMemberId(memberId);
         if (ms.isEmpty()) throw new IllegalStateException("No active membership found.");
 
@@ -200,14 +171,12 @@ public class MemberService {
         req.setMembershipId(membershipId);
         req.setOldTier(oldTier);
         req.setNewTier(newTier);
-        req.setPackageType(packageType);
+        req.setPackageType(ms.get().getPackageType());
         req.setUpgradeFee(fee);
         req.setExpiresAt(LocalDateTime.now().plusDays(3));
         requestDAO.insertTierUpgrade(req);
     }
 
-    // Approves a tier upgrade request
-    // Updates membership tier, package type, end date, and records payment
     public void approveTierUpgrade(int requestId, int recordedBy) {
         List<TierUpgradeRequest> reqs = requestDAO.findPendingTierUpgrades();
         TierUpgradeRequest req = reqs.stream()
@@ -218,37 +187,221 @@ public class MemberService {
         requestDAO.updateTierUpgradeStatus(requestId, "APPROVED");
         membershipDAO.updateTier(req.getMembershipId(), req.getNewTier());
 
-        if (req.getPackageType() != null) {
-            membershipDAO.updatePackageType(req.getMembershipId(), req.getPackageType());
-            LocalDate newEndDate = calcEndDate(req.getPackageType());
-            membershipDAO.updateEndDate(req.getMembershipId(), newEndDate);
-        }
-
         Payment payment = new Payment();
         payment.setMemberId(req.getMemberId());
         payment.setAmount(req.getUpgradeFee());
         payment.setPaymentType("UPGRADE");
-        payment.setDescription(req.getOldTier() + " → " + req.getNewTier()
-                + " (" + req.getPackageType() + ")");
+        payment.setDescription(req.getOldTier() + " → " + req.getNewTier());
         payment.setStatus("PAID");
         payment.setRecordedBy(recordedBy);
+        payment.setPaymentMethod("CASH");
         paymentDAO.insert(payment);
     }
 
-    // Rejects a tier upgrade request
     public void failTierUpgrade(int requestId) {
         requestDAO.updateTierUpgradeStatus(requestId, "REJECTED");
     }
 
-    // Freezes a membership for a given number of days
-    // Freeze limits per tier: CLASSIC = 1, GOLD = 2, VIP = 3
-    // Cannot freeze within 3 days of membership expiry
-    // Extends end date by the freeze duration and sets status to FROZEN
+    // === Online flow — payment is the approval ===
+
+    // Online flow: self-register with successful card payment. Member is ACTIVE
+    // immediately. For ANNUAL_INSTALLMENT, also creates the 12-month installment schedule
+    // with month #1 marked PAID (covered by this initial payment).
+    public void selfRegisterMember(Member member, String tier, String packageType) {
+        validateMember(member);
+        if (!member.getPassword().startsWith("$2a$"))
+            member.setPassword(AuthService.hashPassword(member.getPassword()));
+        member.setStatus("ACTIVE");
+        memberDAO.insert(member);
+
+        Member saved = memberDAO.findByPhone(member.getPhone())
+                .orElseThrow(() -> new IllegalStateException("Member not found after insert: " + member.getPhone()));
+
+        Membership ms = createMembership(saved.getMemberId(), tier, packageType);
+        Payment firstPayment = recordMembershipPayment(saved.getMemberId(), tier, packageType,
+                calculateAmount(tier, packageType), 0, "ONLINE", null);
+
+        // ANNUAL_INSTALLMENT — create the 12-month schedule, with month 1 already paid
+        if ("ANNUAL_INSTALLMENT".equals(packageType)) {
+            createInstallmentSchedule(ms.getMembershipId(), saved.getMemberId(),
+                    calculateAmount(tier, packageType), firstPayment.getPaymentId());
+        }
+    }
+
+    // Online flow: PASSIVE member renews via card payment. Same shape as self-register
+    // but for an existing member — no new member row, just status reset and a fresh membership.
+    public void selfRenewMembership(int memberId, String tier, String packageType) {
+        Member member = memberDAO.findById(memberId)
+                .orElseThrow(() -> new IllegalStateException("Member not found: " + memberId));
+
+        memberDAO.updateStatus(member.getMemberId(), "ACTIVE");
+        // Member is back — clear the cancellation flag and the passive countdown
+        memberDAO.setPassiveSince(member.getMemberId(), null);
+        memberDAO.clearCancellationRequested(member.getMemberId());
+
+        // Defensive: passivate any lingering ACTIVE memberships before inserting new one
+        membershipDAO.findAllByMemberId(memberId).stream()
+                .filter(m -> "ACTIVE".equals(m.getStatus()))
+                .forEach(m -> membershipDAO.updateStatus(m.getMembershipId(), "PASSIVE"));
+
+        Membership ms = createMembership(memberId, tier, packageType);
+        Payment firstPayment = recordMembershipPayment(memberId, tier, packageType,
+                calculateAmount(tier, packageType), 0, "ONLINE", null);
+
+        if ("ANNUAL_INSTALLMENT".equals(packageType)) {
+            createInstallmentSchedule(ms.getMembershipId(), memberId,
+                    calculateAmount(tier, packageType), firstPayment.getPaymentId());
+        }
+    }
+
+    // Online flow: tier upgrade via card payment. Package stays the same.
+    public void selfUpgradeTier(int memberId, int membershipId,
+                                String oldTier, String newTier, double fee) {
+        Optional<Membership> ms = membershipDAO.findActiveByMemberId(memberId);
+        if (ms.isEmpty()) throw new IllegalStateException("No active membership found.");
+
+        membershipDAO.updateTier(membershipId, newTier);
+
+        Payment payment = new Payment();
+        payment.setMemberId(memberId);
+        payment.setAmount(fee);
+        payment.setPaymentType("UPGRADE");
+        payment.setDescription(oldTier + " → " + newTier);
+        payment.setStatus("PAID");
+        payment.setRecordedBy(0);
+        payment.setPaymentMethod("ONLINE");
+        paymentDAO.insert(payment);
+    }
+
+    // === Installment lifecycle ===
+
+    // Creates a 12-row installment schedule for an ANNUAL_INSTALLMENT membership.
+    // Month #1 is marked PAID at creation time — it's covered by the activation payment
+    // (linked via firstPaymentId). Months #2..12 are PENDING with monthly due dates.
+    private void createInstallmentSchedule(int membershipId, int memberId,
+                                           double monthlyAmount, int firstPaymentId) {
+        List<Installment> schedule = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        BigDecimal amount = BigDecimal.valueOf(monthlyAmount);
+
+        for (int i = 1; i <= INSTALLMENT_COUNT; i++) {
+            Installment inst = new Installment();
+            inst.setMembershipId(membershipId);
+            inst.setMemberId(memberId);
+            inst.setInstallmentNo(i);
+            // Month 1 = today; month i = today + (i-1) months
+            inst.setDueDate(today.plusMonths(i - 1));
+            inst.setAmount(amount);
+
+            if (i == 1) {
+                inst.setStatus("PAID");
+                inst.setPaidDate(LocalDateTime.now());
+                inst.setPaymentId(firstPaymentId);
+            } else {
+                inst.setStatus("PENDING");
+            }
+            schedule.add(inst);
+        }
+        installmentDAO.insertAll(schedule);
+    }
+
+    // Pays a single overdue or pending installment via online card payment.
+    // Caller must have already confirmed payment SUCCESS via MockPaymentDialog.
+    // Creates a Payment row of type INSTALLMENT, then marks the installment PAID
+    // and links it to the new payment.
+    public void payInstallment(int installmentId) {
+        Installment inst = installmentDAO.findById(installmentId)
+                .orElseThrow(() -> new IllegalStateException("Installment not found: " + installmentId));
+
+        if ("PAID".equals(inst.getStatus()))
+            throw new IllegalStateException("This installment is already paid.");
+
+        Payment payment = new Payment();
+        payment.setMemberId(inst.getMemberId() != null ? inst.getMemberId() : 0);
+        payment.setAmount(inst.getAmount().doubleValue());
+        payment.setPaymentType("INSTALLMENT");
+        payment.setDescription("Installment #" + inst.getInstallmentNo() + "/" + INSTALLMENT_COUNT);
+        payment.setStatus("PAID");
+        payment.setRecordedBy(0);                  // online self-payment
+        payment.setPaymentMethod("ONLINE");
+        payment.setInstallmentId(installmentId);
+        paymentDAO.insert(payment);                // sets payment.paymentId via generated keys
+
+        installmentDAO.markPaid(installmentId, payment.getPaymentId());
+    }
+
+    // Bulk transition: PENDING installments past their due_date become OVERDUE.
+    // Called from manager dashboard load (sweep) and member dashboard load (cosmetic).
+    public int markOverdueInstallments() {
+        return installmentDAO.markOverdueGlobal();
+    }
+
+    // Returns all installments for a member (for the Installments tab UI)
+    public List<Installment> getInstallmentsForMember(int memberId) {
+        return installmentDAO.findByMemberId(memberId);
+    }
+
+    // Returns only OVERDUE + PENDING-past-due installments for a member
+    public List<Installment> getOverdueInstallments(int memberId) {
+        return installmentDAO.findOverdueForMember(memberId);
+    }
+
+    // Returns true if the member has an active ANNUAL_INSTALLMENT membership.
+    // The Installments tab in the member dashboard is hidden when this returns false.
+    public boolean hasActiveInstallmentMembership(int memberId) {
+        return membershipDAO.findActiveByMemberId(memberId)
+                .map(ms -> "ANNUAL_INSTALLMENT".equals(ms.getPackageType()))
+                .orElse(false);
+    }
+
+    // === Cancellation / deletion lifecycle ===
+
+    // Member self-cancellation: stamps cancellation_requested_at but keeps the membership
+    // ACTIVE until end_date. On next login after expiry, the existing AuthService logic
+    // transitions the member to PASSIVE and stamps passive_since for the 1-year countdown.
+    public void cancelMembership(int memberId) {
+        Optional<Membership> ms = membershipDAO.findActiveByMemberId(memberId);
+        if (ms.isEmpty()) throw new IllegalStateException("No active membership to cancel.");
+        memberDAO.setCancellationRequested(memberId, LocalDateTime.now());
+    }
+
+    // Member self-deletes their account. FK ON DELETE SET NULL preserves audit records
+    // (payments, appointments, event registrations) — those rows stay with member_id = NULL,
+    // and UI helpers (getMemberById().orElse(...)) render "(deleted)" for the missing name.
+    public void deleteAccountSelf(int memberId) {
+        memberDAO.deleteById(memberId);
+    }
+
+    // Manager-initiated deletion. Restricted to SUSPENDED members — the manager must
+    // suspend first (acts as a confirmation gate). Active members can't be deleted by
+    // a manager click; this prevents accidental destruction.
+    public void deleteAccountByManager(int memberId) {
+        Member m = memberDAO.findById(memberId)
+                .orElseThrow(() -> new IllegalStateException("Member not found: " + memberId));
+        if (!"SUSPENDED".equals(m.getStatus()))
+            throw new IllegalStateException(
+                    "Only SUSPENDED members can be deleted. Suspend the member first.");
+        memberDAO.deleteById(memberId);
+    }
+
+    // Sweep: deletes all PASSIVE members whose passive_since is older than 1 year.
+    // Called from ManagerDashboard buildMembersPanel load (and AuthService loginMember
+    // handles the per-account check on login). Returns count of deleted members.
+    public int expireOldPassiveMembers() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(PASSIVE_AUTO_DELETE_DAYS);
+        List<Member> toDelete = memberDAO.findPassiveOlderThan(cutoff);
+        for (Member m : toDelete) {
+            memberDAO.deleteById(m.getMemberId());
+        }
+        return toDelete.size();
+    }
+
+    // === Membership lifecycle (existing) ===
+
     public void freezeMembership(int membershipId, int days) {
         Membership ms = membershipDAO.findById(membershipId)
                 .orElseThrow(() -> new IllegalStateException("Membership not found."));
 
-        // Determine freeze limit based on tier
         int maxFreeze = switch (ms.getTier()) {
             case "GOLD" -> 2;
             case "VIP"  -> 3;
@@ -258,7 +411,6 @@ public class MemberService {
         if (ms.getFreezeCount() >= maxFreeze)
             throw new IllegalStateException("Freeze limit reached for " + ms.getTier() + " tier.");
 
-        // Cannot freeze within 3 days of membership expiry date
         if (ms.getEndDate().minusDays(3).isBefore(LocalDate.now()))
             throw new IllegalStateException("Cannot freeze within 3 days of expiry.");
 
@@ -269,7 +421,6 @@ public class MemberService {
         memberDAO.updateStatus(ms.getMemberId(), "FROZEN");
     }
 
-    // Unfreezes a membership — sets both membership and member status back to ACTIVE
     public void unfreezeMembership(int membershipId) {
         Membership ms = membershipDAO.findById(membershipId)
                 .orElseThrow(() -> new IllegalStateException("Membership not found."));
@@ -277,12 +428,11 @@ public class MemberService {
         memberDAO.updateStatus(ms.getMemberId(), "ACTIVE");
     }
 
-    // Directly inserts a registration request — used for renewal submissions
     public void submitRegistrationRequest(RegistrationRequest req) {
         requestDAO.insertRegistration(req);
     }
 
-    // --- Query Methods ---
+    // === Query Methods ===
 
     public Optional<Member> getMemberById(int memberId) {
         return memberDAO.findById(memberId);
@@ -316,18 +466,15 @@ public class MemberService {
         return paymentDAO.findByMemberId(memberId);
     }
 
-    // Suspends a member account — member cannot log in while suspended
     public void suspendMember(int memberId) {
         memberDAO.updateStatus(memberId, "SUSPENDED");
     }
 
-    // Unlocks a member account and resets failed attempt counter
     public void unlockMember(int memberId) {
         memberDAO.updateLockStatus(memberId, false);
         memberDAO.updateFailedAttempts(memberId, 0);
     }
 
-    // Updates member profile fields and recalculates BMI if weight and height are provided
     public void updateMemberProfile(int memberId, Double weight, Double height,
                                     String ecName, String ecPhone) {
         memberDAO.updateProfile(memberId, weight, height, ecName, ecPhone);
@@ -338,12 +485,8 @@ public class MemberService {
         }
     }
 
-    // --- Utility Methods ---
+    // === Pricing & validation ===
 
-    // Calculates the membership fee based on tier and package type
-    // Base monthly prices: CLASSIC = 750, GOLD = 1250, VIP = 2000
-    // ANNUAL_PREPAID: 15% discount on 12 months
-    // ANNUAL_INSTALLMENT: 7% surcharge on monthly price
     public double calculateAmount(String tier, String packageType) {
         double monthly = switch (tier) {
             case "GOLD" -> 1250.0;
@@ -357,8 +500,6 @@ public class MemberService {
         };
     }
 
-    // Calculates the membership end date based on package type
-    // ANNUAL packages: 365 days | MONTHLY: 30 days
     private LocalDate calcEndDate(String packageType) {
         return switch (packageType) {
             case "ANNUAL_PREPAID", "ANNUAL_INSTALLMENT" -> LocalDate.now().plusDays(365);
@@ -366,7 +507,6 @@ public class MemberService {
         };
     }
 
-    // Returns the BMI category label based on BMI value
     private String calcBmiCategory(double bmi) {
         if (bmi < 18.5) return "UNDERWEIGHT";
         if (bmi < 25.0) return "NORMAL";
@@ -374,8 +514,6 @@ public class MemberService {
         return "OBESE";
     }
 
-    // Validates member data before insert
-    // Checks: age >= 18, phone not blank, phone unique, email unique
     private void validateMember(Member member) {
         if (member.getDateOfBirth() == null)
             throw new IllegalArgumentException("Date of birth is required.");
@@ -389,8 +527,6 @@ public class MemberService {
             throw new IllegalArgumentException("Email address already registered.");
     }
 
-    // Updates a member's phone number after uniqueness check
-    // Skips the check if the new phone is the same as the current one
     public void updatePhone(int memberId, String newPhone) {
         memberDAO.findById(memberId).ifPresent(m -> {
             if (!newPhone.equals(m.getPhone()) && memberDAO.existsByPhone(newPhone))
@@ -399,8 +535,6 @@ public class MemberService {
         memberDAO.updatePhone(memberId, newPhone);
     }
 
-    // Updates a member's email address after uniqueness check
-    // Skips the check if the new email is the same as the current one or blank
     public void updateEmail(int memberId, String newEmail) {
         memberDAO.findById(memberId).ifPresent(m -> {
             if (newEmail != null && !newEmail.isBlank()
@@ -419,14 +553,11 @@ public class MemberService {
         return requestDAO.findAllTierUpgrades();
     }
 
-    // Calculates BMI value from weight (kg) and height (cm)
-    // Result is rounded to 2 decimal places
     public double calculateBmi(double weight, double height) {
         double heightM = height / 100.0;
         return Math.round((weight / (heightM * heightM)) * 100.0) / 100.0;
     }
 
-    // Returns the BMI category label for a given BMI value
     public String getBmiCategory(double bmi) {
         if (bmi < 18.5) return "UNDERWEIGHT";
         if (bmi < 25.0) return "NORMAL";
@@ -434,7 +565,6 @@ public class MemberService {
         return "OBESE";
     }
 
-    // Returns lifestyle suggestions based on BMI category
     public String[] getBmiSuggestions(String category) {
         return switch (category) {
             case "UNDERWEIGHT" -> new String[]{
@@ -461,13 +591,8 @@ public class MemberService {
         };
     }
 
-    // Calculates estimated daily calorie needs using the Harris-Benedict formula
-    // FIX: Uses Period.between() for accurate age calculation
-    // (year difference alone is inaccurate if birthday hasn't occurred yet this year)
-    // Activity multiplier is set to 1.55 (moderately active)
     public double calculateDailyCalories(double weight, double height,
                                          String gender, LocalDate dob) {
-        // Accurate age calculation — accounts for whether birthday has passed this year
         int age = Period.between(dob, LocalDate.now()).getYears();
         double bmr;
         if ("MALE".equals(gender))
@@ -475,5 +600,44 @@ public class MemberService {
         else
             bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
         return bmr * 1.55;
+    }
+
+    // === Internal helpers ===
+
+    // Creates and inserts a new ACTIVE membership row, then re-fetches to populate
+    // its DB-generated membership_id back onto the returned object.
+    private Membership createMembership(int memberId, String tier, String packageType) {
+        Membership ms = new Membership();
+        ms.setMemberId(memberId);
+        ms.setTier(tier);
+        ms.setPackageType(packageType);
+        ms.setStartDate(LocalDate.now());
+        ms.setEndDate(calcEndDate(packageType));
+        ms.setStatus("ACTIVE");
+        ms.setFreezeCount(0);
+        membershipDAO.insert(ms);
+        // Re-fetch so callers can use the generated membership_id (e.g. for installment FK)
+        return membershipDAO.findActiveByMemberId(memberId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Just-inserted membership not found for member " + memberId));
+    }
+
+    // Helper: build and insert a MEMBERSHIP-type payment record.
+    // Returns the inserted Payment with its generated paymentId so callers (e.g. installment
+    // schedule creation) can link to it.
+    private Payment recordMembershipPayment(int memberId, String tier, String packageType,
+                                            double amount, int managerId,
+                                            String method, Integer installmentId) {
+        Payment payment = new Payment();
+        payment.setMemberId(memberId);
+        payment.setAmount(amount);
+        payment.setPaymentType("MEMBERSHIP");
+        payment.setDescription(tier + " - " + packageType);
+        payment.setStatus("PAID");
+        payment.setRecordedBy(managerId);
+        payment.setPaymentMethod(method);
+        payment.setInstallmentId(installmentId);
+        paymentDAO.insert(payment);
+        return payment;
     }
 }

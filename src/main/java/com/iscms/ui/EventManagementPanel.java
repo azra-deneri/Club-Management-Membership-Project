@@ -47,6 +47,7 @@ public class EventManagementPanel extends JPanel {
         JButton btnDetail   = new JButton("View Registrations");
         JButton btnEdit     = new JButton("Edit Event");
 
+
         btnEdit.setBackground(new Color(180, 130, 0));
         btnEdit.setForeground(Color.WHITE);
         btnEdit.setOpaque(true);

@@ -1,23 +1,41 @@
 package com.iscms.ui;
 
 import com.iscms.model.*;
+import com.iscms.service.AuthService;
 import com.iscms.service.MemberService;
+import com.iscms.service.PaymentResult;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
-// Main dashboard for logged-in members
-// Provides 6 tabs: Profile, Membership, Events, PT Sessions, BMI, Payments
+// Main dashboard for logged-in members.
+//
+// Tab layout is dynamic:
+//   - Always shown: Profile, Membership, Events, PT Sessions, BMI, Payments
+//   - Conditionally shown: Installments — only when the member has an active
+//     ANNUAL_INSTALLMENT membership OR has historical installment records.
+//     Members on MONTHLY / ANNUAL_PREPAID never see this tab.
+//
+// Profile tab now hosts two account-lifecycle actions:
+//   - Cancel Membership: enabled only for ACTIVE members; flips a flag, membership
+//     stays active until end_date, then auto-passivates on next login.
+//   - Delete Account: hard-delete after password verification and confirmation.
+//     FK ON DELETE SET NULL preserves audit records (payments etc).
 public class MemberDashboard extends JFrame {
 
-    // The currently logged-in member
     private final Member member;
-
-    // Service instance — no DAOs directly in UI layer
     private final MemberService memberService = new MemberService();
+    private final AuthService   authService   = new AuthService();
+
+    // Cached on initUI so installment tab visibility decision is consistent
+    // across renders, even if the membership status changes mid-session.
+    private boolean showInstallmentsTab;
 
     public MemberDashboard(Member member) {
         this.member = member;
@@ -28,7 +46,6 @@ public class MemberDashboard extends JFrame {
         initUI();
     }
 
-    // Builds the main layout: top bar + tabbed pane with 6 tabs
     private void initUI() {
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(new Color(33, 120, 80));
@@ -39,7 +56,6 @@ public class MemberDashboard extends JFrame {
         lblTitle.setFont(new Font("Arial", Font.BOLD, 14));
         topBar.add(lblTitle, BorderLayout.WEST);
 
-        // Logout button — closes dashboard and opens login screen
         JButton btnLogout = new JButton("Logout");
         btnLogout.setBackground(new Color(180, 50, 50));
         btnLogout.setForeground(Color.WHITE);
@@ -52,7 +68,17 @@ public class MemberDashboard extends JFrame {
         topBar.add(right, BorderLayout.EAST);
         add(topBar, BorderLayout.NORTH);
 
-        // Six tabs — Events, PT Sessions, BMI reuse dedicated panel classes
+        // Decide once whether to show the Installments tab. Triggers when the member
+        // either has an active ANNUAL_INSTALLMENT membership OR any historical
+        // installment records (so PASSIVE members can still see their old schedule).
+        boolean hasActive = memberService.hasActiveInstallmentMembership(member.getMemberId());
+        boolean hasAny    = !memberService.getInstallmentsForMember(member.getMemberId()).isEmpty();
+        showInstallmentsTab = hasActive || hasAny;
+
+        // Refresh OVERDUE statuses on dashboard load so the installments table
+        // shows accurate badges without waiting for a manager-side sweep.
+        memberService.markOverdueInstallments();
+
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Profile",     buildProfilePanel());
         tabs.addTab("Membership",  buildMembershipPanel());
@@ -60,14 +86,15 @@ public class MemberDashboard extends JFrame {
         tabs.addTab("PT Sessions", new PTPanel(member));
         tabs.addTab("BMI",         new BmiPanel(member));
         tabs.addTab("Payments",    buildPaymentsPanel());
+        if (showInstallmentsTab) {
+            tabs.addTab("Installments", buildInstallmentsPanel());
+        }
         add(tabs, BorderLayout.CENTER);
     }
 
     // --- Profile Tab ---
+    // Includes editable profile fields PLUS account-lifecycle buttons at the bottom.
 
-    // Builds the profile edit form
-    // Read-only: full name, date of birth
-    // Editable: phone, email, weight, height, emergency contact
     private JPanel buildProfilePanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
@@ -75,7 +102,6 @@ public class MemberDashboard extends JFrame {
         c.insets = new Insets(6, 6, 6, 6);
         c.fill = GridBagConstraints.HORIZONTAL;
 
-        // Read-only fields shown with grey background
         JTextField txtName   = readOnly(member.getFullName());
         JTextField txtPhone  = new JTextField(member.getPhone() != null ? member.getPhone() : "");
         JTextField txtEmail  = new JTextField(member.getEmail() != null ? member.getEmail() : "");
@@ -110,13 +136,10 @@ public class MemberDashboard extends JFrame {
                 String newPhone = txtPhone.getText().trim();
                 String newEmail = txtEmail.getText().trim();
 
-                // Validation: phone must not be empty
                 if (newPhone.isEmpty()) {
                     JOptionPane.showMessageDialog(panel, "Phone number cannot be empty.");
                     return;
                 }
-
-                // Validation: phone must be exactly 10 digits
                 if (newPhone.length() != 10 || !newPhone.matches("\\d+")) {
                     JOptionPane.showMessageDialog(panel,
                             "Phone must be exactly 10 digits.",
@@ -124,38 +147,31 @@ public class MemberDashboard extends JFrame {
                     return;
                 }
 
-                // Nullable doubles — empty field means null (not provided)
                 Double weight = txtWeight.getText().isBlank() ? null
                         : Double.parseDouble(txtWeight.getText().trim());
                 Double height = txtHeight.getText().isBlank() ? null
                         : Double.parseDouble(txtHeight.getText().trim());
 
-                // Update weight, height, emergency contact via service
-                // BMI is automatically recalculated if both weight and height are provided
                 memberService.updateMemberProfile(member.getMemberId(),
                         weight, height,
                         txtEcName.getText().trim(),
                         txtEcPhone.getText().trim());
 
-                // Update phone only if it changed — uniqueness check handled in service
                 if (!newPhone.equals(member.getPhone())) {
                     memberService.updatePhone(member.getMemberId(), newPhone);
                     member.setPhone(newPhone);
                 }
 
-                // Update email only if it changed — uniqueness check handled in service
                 if (!newEmail.equals(member.getEmail() != null ? member.getEmail() : "")) {
                     memberService.updateEmail(member.getMemberId(), newEmail);
                     member.setEmail(newEmail);
                 }
 
-                // Update local member object to reflect saved values
                 member.setWeight(weight);
                 member.setHeight(height);
                 member.setEmergencyContactName(txtEcName.getText().trim());
                 member.setEmergencyContactPhone(txtEcPhone.getText().trim());
 
-                // Refresh BMI tab to show updated values
                 refreshBmiTab();
                 JOptionPane.showMessageDialog(panel, "Profile updated successfully.");
             } catch (NumberFormatException ex) {
@@ -168,11 +184,154 @@ public class MemberDashboard extends JFrame {
             }
         });
 
+        // === Account lifecycle buttons (Batch 4) ===
+        // Visual separator before the danger-zone buttons
+        JSeparator sep = new JSeparator();
+        c.gridx = 0; c.gridy = fields.length + 1; c.gridwidth = 2;
+        c.insets = new Insets(20, 6, 6, 6);
+        panel.add(sep, c);
+
+        JLabel lblSection = new JLabel("Account");
+        lblSection.setFont(new Font("Arial", Font.BOLD, 13));
+        c.gridy = fields.length + 2;
+        c.insets = new Insets(0, 6, 6, 6);
+        panel.add(lblSection, c);
+
+        // --- Cancel Membership button ---
+        // Active member with no pending cancellation: button enabled
+        // Active member who already requested cancellation: shows confirmation label
+        // PASSIVE/FROZEN/SUSPENDED member: cancel button hidden (already non-active)
+        c.gridy = fields.length + 3;
+        if ("ACTIVE".equals(member.getStatus())) {
+            if (member.isCancellationRequested()) {
+                // Already cancelled — show informational label, no button
+                JLabel lblCancelled = new JLabel(
+                        "✓ Cancellation requested on "
+                                + member.getCancellationRequestedAt()
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                                + ". Membership remains active until its end date.");
+                lblCancelled.setForeground(new Color(180, 130, 0));
+                panel.add(lblCancelled, c);
+            } else {
+                JButton btnCancel = new JButton("Cancel Membership");
+                btnCancel.setBackground(new Color(180, 130, 0));
+                btnCancel.setForeground(Color.WHITE);
+                btnCancel.setOpaque(true);
+                btnCancel.setBorderPainted(false);
+                btnCancel.addActionListener(e -> handleCancelMembership());
+                panel.add(btnCancel, c);
+            }
+        }
+
+        // --- Delete Account button ---
+        // Always visible — gives every member the option to leave the system entirely.
+        c.gridy = fields.length + 4;
+        JButton btnDelete = new JButton("Delete Account");
+        btnDelete.setBackground(new Color(150, 50, 50));
+        btnDelete.setForeground(Color.WHITE);
+        btnDelete.setOpaque(true);
+        btnDelete.setBorderPainted(false);
+        btnDelete.addActionListener(e -> handleDeleteAccount());
+        panel.add(btnDelete, c);
+
         return panel;
     }
 
-    // Refreshes the BMI tab after profile updates
-    // Re-fetches member from DB to get the latest BMI values
+    // Member-initiated membership cancellation.
+    // Membership stays ACTIVE until end_date; only flips a flag here.
+    // Login-time logic in AuthService transitions the member to PASSIVE on expiry.
+    private void handleCancelMembership() {
+        Optional<Membership> ms = memberService.getActiveMembership(member.getMemberId());
+        if (ms.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "You don't have an active membership to cancel.",
+                    "Nothing to Cancel", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        String message =
+                "Are you sure you want to cancel your membership?\n\n" +
+                        "• Your membership will remain active until " + ms.get().getEndDate() + ".\n" +
+                        "• After that date, your account becomes PASSIVE.\n" +
+                        "• You can renew anytime within 1 year of expiry.\n" +
+                        "• If you don't renew within 1 year, your account will be deleted.\n\n" +
+                        "This is reversible — you can renew at any time.";
+
+        int choice = JOptionPane.showConfirmDialog(this, message,
+                "Cancel Membership", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+
+        if (choice != JOptionPane.YES_OPTION) return;
+
+        try {
+            memberService.cancelMembership(member.getMemberId());
+            // Keep local copy in sync so re-rendering shows the "Cancellation Requested" label
+            member.setCancellationRequestedAt(LocalDateTime.now());
+            JOptionPane.showMessageDialog(this,
+                    "Your cancellation has been recorded.\n" +
+                            "Your membership remains active until " + ms.get().getEndDate() + ".",
+                    "Cancellation Recorded", JOptionPane.INFORMATION_MESSAGE);
+            refreshProfileTab();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // Member-initiated full account deletion.
+    // Requires password verification (defense against accidental clicks /
+    // someone using a logged-in computer that isn't theirs) plus an explicit
+    // typed confirmation. After deletion, dashboard closes and login screen reopens.
+    private void handleDeleteAccount() {
+        // Step 1: explain what's about to happen
+        int firstConfirm = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to PERMANENTLY DELETE your account?\n\n" +
+                        "• All personal information will be removed.\n" +
+                        "• Past payment records will be retained for accounting (anonymously).\n" +
+                        "• You can register again later with the same phone number if you wish.\n\n" +
+                        "This action CANNOT be undone.",
+                "Delete Account?", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (firstConfirm != JOptionPane.YES_OPTION) return;
+
+        // Step 2: password verification
+        JPasswordField pwd = new JPasswordField(15);
+        int pwdConfirm = JOptionPane.showConfirmDialog(this, pwd,
+                "Enter your password to confirm",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (pwdConfirm != JOptionPane.OK_OPTION) return;
+
+        String password = new String(pwd.getPassword());
+        if (password.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Password cannot be empty.");
+            return;
+        }
+        if (!authService.verifyMemberPassword(member.getMemberId(), password)) {
+            JOptionPane.showMessageDialog(this,
+                    "Incorrect password. Account was NOT deleted.",
+                    "Authentication Failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Step 3: final irreversible step
+        int finalConfirm = JOptionPane.showConfirmDialog(this,
+                "Last chance. Click Yes to permanently delete your account.\n\n" +
+                        "Click No to keep your account.",
+                "Final Confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (finalConfirm != JOptionPane.YES_OPTION) return;
+
+        try {
+            memberService.deleteAccountSelf(member.getMemberId());
+            JOptionPane.showMessageDialog(this,
+                    "Your account has been deleted. We're sorry to see you go.",
+                    "Account Deleted", JOptionPane.INFORMATION_MESSAGE);
+            dispose();
+            new LoginFrame().setVisible(true);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Could not delete account: " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     private void refreshBmiTab() {
         for (Component comp : getContentPane().getComponents()) {
             if (comp instanceof JTabbedPane tabs) {
@@ -181,8 +340,20 @@ public class MemberDashboard extends JFrame {
                 member.setHeight(refreshed.getHeight());
                 member.setBmiValue(refreshed.getBmiValue());
                 member.setBmiCategory(refreshed.getBmiCategory());
-                // Replace BMI tab content with a fresh BmiPanel
                 tabs.setComponentAt(4, new BmiPanel(member));
+                tabs.revalidate();
+                tabs.repaint();
+                break;
+            }
+        }
+    }
+
+    // Rebuilds the Profile tab so the cancellation label appears after a click
+    // (without forcing the user to log out and log back in).
+    private void refreshProfileTab() {
+        for (Component comp : getContentPane().getComponents()) {
+            if (comp instanceof JTabbedPane tabs) {
+                tabs.setComponentAt(0, buildProfilePanel());
                 tabs.revalidate();
                 tabs.repaint();
                 break;
@@ -192,24 +363,19 @@ public class MemberDashboard extends JFrame {
 
     // --- Membership Tab ---
 
-    // Builds the membership info panel
-    // Shows current membership details, freeze count, tier benefits
-    // Provides buttons: upgrade tier, freeze, renew (if PASSIVE)
     private JPanel buildMembershipPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
 
         Optional<Membership> msOpt = memberService.getActiveMembership(member.getMemberId());
 
-        // Handle case where no active membership exists
         if (msOpt.isEmpty()) {
             List<Membership> all = memberService.getAllMemberships(member.getMemberId());
-            // If member is PASSIVE — show renewal option
             if (!all.isEmpty() && "PASSIVE".equals(member.getStatus())) {
                 Membership lastMs = all.getLast();
                 JPanel centerPanel = new JPanel(new BorderLayout(10, 10));
                 JLabel lblMsg = new JLabel(
-                        "Your membership has expired. Please submit a renewal request.",
+                        "Your membership has expired. Please submit a renewal.",
                         SwingConstants.CENTER);
                 lblMsg.setForeground(new Color(180, 50, 50));
                 centerPanel.add(lblMsg, BorderLayout.NORTH);
@@ -236,7 +402,6 @@ public class MemberDashboard extends JFrame {
         long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(
                 LocalDateTime.now().toLocalDate(), ms.getEndDate());
 
-        // Membership info grid
         JPanel info = new JPanel(new GridLayout(0, 2, 10, 8));
         info.setBorder(BorderFactory.createTitledBorder("Current Membership"));
         info.add(new JLabel("Tier:"));           info.add(new JLabel(ms.getTier()));
@@ -252,7 +417,6 @@ public class MemberDashboard extends JFrame {
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
 
-        // Tier upgrade button — disabled for VIP (already at highest tier)
         JButton btnUpgrade = new JButton("Request Tier Upgrade");
         btnUpgrade.setBackground(new Color(180, 130, 0));
         btnUpgrade.setForeground(Color.WHITE);
@@ -266,12 +430,10 @@ public class MemberDashboard extends JFrame {
         }
         btnPanel.add(btnUpgrade);
 
-        // Freeze button — business rules enforced in service
         JButton btnFreeze = new JButton("Freeze Membership");
         btnFreeze.addActionListener(e -> showFreezeDialog(ms));
         btnPanel.add(btnFreeze);
 
-        // Renewal button — only shown for members with PASSIVE status
         if ("PASSIVE".equals(member.getStatus())) {
             JButton btnRenew = new JButton("Renew Membership");
             btnRenew.setBackground(new Color(33, 120, 80));
@@ -286,100 +448,133 @@ public class MemberDashboard extends JFrame {
         return panel;
     }
 
-    // Dialog for requesting a tier upgrade
-    // Shows available tiers based on current tier (CLASSIC → GOLD/VIP, GOLD → VIP)
-    // Fee is calculated as: (new daily rate - current daily rate) × days remaining
+    // --- Tier Upgrade Dialog ---
+
     private void showUpgradeDialog(Membership ms, long daysLeft) {
         String[] availableTiers = "CLASSIC".equals(ms.getTier())
                 ? new String[]{"GOLD", "VIP"}
                 : new String[]{"VIP"};
 
         JComboBox<String> cbNewTier = new JComboBox<>(availableTiers);
-        JComboBox<String> cbPackage = new JComboBox<>(
-                new String[]{"MONTHLY", "ANNUAL_INSTALLMENT", "ANNUAL_PREPAID"});
+
+        JRadioButton rbCash   = new JRadioButton("Cash (pay at the club)", true);
+        JRadioButton rbOnline = new JRadioButton("Online (pay by card now)");
+        ButtonGroup bg = new ButtonGroup();
+        bg.add(rbCash); bg.add(rbOnline);
 
         JPanel content  = new JPanel(new BorderLayout(0, 10));
         JPanel infoPanel = new JPanel(new GridLayout(0, 1, 0, 4));
         infoPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
-        infoPanel.add(new JLabel("Current Tier: " + ms.getTier()));
+
+        infoPanel.add(new JLabel("Current Tier: " + ms.getTier()
+                + "  |  Package: " + ms.getPackageType()
+                + " (unchanged)"));
 
         JPanel tierRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
         tierRow.add(new JLabel("New Tier:"));
         tierRow.add(cbNewTier);
         infoPanel.add(tierRow);
 
-        JPanel packageRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        packageRow.add(new JLabel("Package:  "));
-        packageRow.add(cbPackage);
-        infoPanel.add(packageRow);
-
         JLabel lblFee = new JLabel();
         infoPanel.add(lblFee);
         infoPanel.add(new JLabel("Days Remaining: " + daysLeft));
-        infoPanel.add(new JLabel("Request will be sent to manager. Please pay within 3 days."));
 
-        // Recalculates and updates the fee label whenever tier or package changes
+        JPanel payPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        payPanel.setBorder(BorderFactory.createTitledBorder("Payment Method"));
+        payPanel.add(rbCash);
+        payPanel.add(rbOnline);
+        infoPanel.add(payPanel);
+
         Runnable updateFee = () -> {
             String newTier = cbNewTier.getSelectedItem() != null
                     ? cbNewTier.getSelectedItem().toString() : availableTiers[0];
-            String pkg = cbPackage.getSelectedItem() != null
-                    ? cbPackage.getSelectedItem().toString() : "MONTHLY";
 
-            double currentDaily = memberService.calculateAmount(ms.getTier(), "MONTHLY") / 30;
-            double newDaily = switch (pkg) {
-                case "ANNUAL_PREPAID"     -> (memberService.calculateAmount(newTier, "MONTHLY") * 12 * 0.85) / 365;
-                case "ANNUAL_INSTALLMENT" -> (memberService.calculateAmount(newTier, "MONTHLY") * 1.07) / 30;
-                default                   -> memberService.calculateAmount(newTier, "MONTHLY") / 30;
-            };
+            double currentDaily = perDayRate(ms.getTier(), ms.getPackageType());
+            double newDaily     = perDayRate(newTier,     ms.getPackageType());
             double fee = Math.max(0, (newDaily - currentDaily) * daysLeft);
             lblFee.setText(String.format("Upgrade Fee: %.2f TL", fee));
         };
         cbNewTier.addActionListener(e -> updateFee.run());
-        cbPackage.addActionListener(e -> updateFee.run());
         updateFee.run();
 
         content.add(infoPanel, BorderLayout.NORTH);
         content.add(new TierBenefitsPanel(), BorderLayout.CENTER);
-        content.setPreferredSize(new Dimension(700, 450));
+        content.setPreferredSize(new Dimension(700, 520));
 
         int confirm = JOptionPane.showConfirmDialog(this, content,
                 "Upgrade Tier", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
 
-        if (confirm == JOptionPane.YES_OPTION) {
-            String newTier = cbNewTier.getSelectedItem() != null
-                    ? cbNewTier.getSelectedItem().toString() : availableTiers[0];
-            String pkg = cbPackage.getSelectedItem() != null
-                    ? cbPackage.getSelectedItem().toString() : "MONTHLY";
+        String newTier = cbNewTier.getSelectedItem() != null
+                ? cbNewTier.getSelectedItem().toString() : availableTiers[0];
 
-            // Recalculate fee before submitting — consistent with displayed value
-            double currentDaily = memberService.calculateAmount(ms.getTier(), "MONTHLY") / 30;
-            double newDaily = switch (pkg) {
-                case "ANNUAL_PREPAID"     -> (memberService.calculateAmount(newTier, "MONTHLY") * 12 * 0.85) / 365;
-                case "ANNUAL_INSTALLMENT" -> (memberService.calculateAmount(newTier, "MONTHLY") * 1.07) / 30;
-                default                   -> memberService.calculateAmount(newTier, "MONTHLY") / 30;
-            };
-            double fee = Math.max(0, (newDaily - currentDaily) * daysLeft);
+        double currentDaily = perDayRate(ms.getTier(), ms.getPackageType());
+        double newDaily     = perDayRate(newTier,     ms.getPackageType());
+        double fee = Math.max(0, (newDaily - currentDaily) * daysLeft);
 
-            try {
-                // Submit upgrade request via service — creates DB record with 3-day expiry
-                memberService.createTierUpgradeRequest(
-                        member.getMemberId(), ms.getMembershipId(),
-                        ms.getTier(), newTier, pkg, fee);
-                JOptionPane.showMessageDialog(this,
-                        "Upgrade request submitted!\n" +
-                                "Please pay " + String.format("%.2f TL", fee) +
-                                " to the manager within 3 days.",
-                        "Request Submitted", JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
-            }
+        if (rbOnline.isSelected()) {
+            handleOnlineUpgrade(ms, newTier, fee);
+        } else {
+            handleCashUpgrade(ms, newTier, fee);
         }
     }
 
-    // Dialog for freezing the membership
-    // Offers 3 freeze duration options: 7, 14, or 30 days
-    // Business rules (freeze limit, 3-day expiry window) enforced in service
+    private void handleCashUpgrade(Membership ms, String newTier, double fee) {
+        try {
+            memberService.createTierUpgradeRequest(
+                    member.getMemberId(), ms.getMembershipId(),
+                    ms.getTier(), newTier, fee);
+            JOptionPane.showMessageDialog(this,
+                    "Upgrade request submitted!\n" +
+                            "Please pay " + String.format("%.2f TL", fee) +
+                            " in cash to the manager within 3 days.",
+                    "Request Submitted", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleOnlineUpgrade(Membership ms, String newTier, double fee) {
+        String purpose = "Tier Upgrade: " + ms.getTier() + " → " + newTier;
+        PaymentResult result = MockPaymentDialog.showAndProcess(this, fee, purpose);
+
+        if (result == PaymentResult.CANCELLED) return;
+
+        if (!result.isSuccess()) {
+            JOptionPane.showMessageDialog(this,
+                    MockPaymentDialog.describe(result) + "\n\nUpgrade was not applied.",
+                    "Payment Failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        try {
+            memberService.selfUpgradeTier(
+                    member.getMemberId(), ms.getMembershipId(),
+                    ms.getTier(), newTier, fee);
+            JOptionPane.showMessageDialog(this,
+                    "Tier upgraded successfully!\n\n" +
+                            "Your membership is now " + newTier + ".",
+                    "Upgrade Complete", JOptionPane.INFORMATION_MESSAGE);
+            refreshMembershipTab();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Payment was processed but the upgrade failed:\n" + ex.getMessage()
+                            + "\n\nPlease contact the club for assistance.",
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private double perDayRate(String tier, String packageType) {
+        return switch (packageType) {
+            case "ANNUAL_PREPAID"     -> (memberService.calculateAmount(tier, "MONTHLY") * 12 * 0.85) / 365;
+            case "ANNUAL_INSTALLMENT" -> (memberService.calculateAmount(tier, "MONTHLY") * 1.07) / 30;
+            default                   -> memberService.calculateAmount(tier, "MONTHLY") / 30;
+        };
+    }
+
+    // --- Freeze Dialog ---
+
     private void showFreezeDialog(Membership ms) {
         String[] options = {"7 days", "14 days", "30 days"};
         int choice = JOptionPane.showOptionDialog(this,
@@ -400,7 +595,6 @@ public class MemberDashboard extends JFrame {
         }
     }
 
-    // Refreshes the membership tab after freeze/unfreeze operations
     private void refreshMembershipTab() {
         for (Component comp : getContentPane().getComponents()) {
             if (comp instanceof JTabbedPane tabs) {
@@ -412,18 +606,16 @@ public class MemberDashboard extends JFrame {
         }
     }
 
-    // Dialog for submitting a membership renewal request
-    // Available tiers depend on current tier — members cannot downgrade
-    // Calculates estimated amount dynamically as tier/package selection changes
+    // --- Renewal Dialog ---
+
     private void showRenewDialog(String currentTier) {
         JDialog dialog = new JDialog(this, "Renew Membership", true);
-        dialog.setSize(500, 350);
+        dialog.setSize(540, 460);
         dialog.setLocationRelativeTo(this);
 
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
 
-        // Members cannot renew to a lower tier than their current one
         String[] tiers = switch (currentTier) {
             case "GOLD" -> new String[]{"GOLD", "VIP"};
             case "VIP"  -> new String[]{"VIP"};
@@ -431,20 +623,49 @@ public class MemberDashboard extends JFrame {
         };
 
         JComboBox<String> cbTier    = new JComboBox<>(tiers);
-        JComboBox<String> cbPackage = new JComboBox<>(
-                new String[]{"MONTHLY", "ANNUAL_INSTALLMENT", "ANNUAL_PREPAID"});
+        JComboBox<String> cbPackage = new JComboBox<>();
+
+        JRadioButton rbCash   = new JRadioButton("Cash (pay at the club)", true);
+        JRadioButton rbOnline = new JRadioButton("Online (pay by card now)");
+        ButtonGroup bg = new ButtonGroup();
+        bg.add(rbCash); bg.add(rbOnline);
+
         JLabel lblAmount = new JLabel("Amount: 750.00 TL /month");
         lblAmount.setFont(new Font("Arial", Font.BOLD, 12));
         lblAmount.setForeground(new Color(33, 87, 141));
 
         JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
-        form.add(new JLabel("Tier *:"));          form.add(cbTier);
+        form.add(new JLabel("Tier *:"));           form.add(cbTier);
         form.add(new JLabel("Package *:"));        form.add(cbPackage);
         form.add(new JLabel("Estimated Amount:")); form.add(lblAmount);
-        panel.add(form, BorderLayout.CENTER);
 
-        // Recalculates and updates the amount label whenever tier or package changes
-        // Uses existing memberService field — no need for a separate instance
+        JPanel payPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        payPanel.setBorder(BorderFactory.createTitledBorder("Payment Method"));
+        payPanel.add(rbCash);
+        payPanel.add(rbOnline);
+
+        JPanel center = new JPanel(new BorderLayout(0, 10));
+        center.add(form, BorderLayout.NORTH);
+        center.add(payPanel, BorderLayout.CENTER);
+        panel.add(center, BorderLayout.CENTER);
+
+        Runnable refreshPackages = () -> {
+            String prev = (String) cbPackage.getSelectedItem();
+            cbPackage.removeAllItems();
+            String[] packages = rbOnline.isSelected()
+                    ? new String[]{"MONTHLY", "ANNUAL_INSTALLMENT", "ANNUAL_PREPAID"}
+                    : new String[]{"MONTHLY", "ANNUAL_PREPAID"};
+            for (String pkg : packages) cbPackage.addItem(pkg);
+            if (prev != null) {
+                for (int i = 0; i < cbPackage.getItemCount(); i++) {
+                    if (prev.equals(cbPackage.getItemAt(i))) {
+                        cbPackage.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+        };
+
         Runnable updateAmt = () -> {
             String tier = cbTier.getSelectedItem() != null
                     ? cbTier.getSelectedItem().toString() : "CLASSIC";
@@ -458,11 +679,16 @@ public class MemberDashboard extends JFrame {
             };
             lblAmount.setText(String.format("Amount: %.2f TL%s", amt, note));
         };
-        cbTier.addActionListener(e -> updateAmt.run());
+
+        cbTier.addActionListener(e    -> updateAmt.run());
         cbPackage.addActionListener(e -> updateAmt.run());
+        rbCash.addActionListener(e   -> { refreshPackages.run(); updateAmt.run(); });
+        rbOnline.addActionListener(e -> { refreshPackages.run(); updateAmt.run(); });
+
+        refreshPackages.run();
         updateAmt.run();
 
-        JButton btnSubmit = new JButton("Submit Renewal Request");
+        JButton btnSubmit = new JButton("Submit Renewal");
         btnSubmit.setBackground(new Color(33, 120, 80));
         btnSubmit.setForeground(Color.WHITE);
         btnSubmit.setOpaque(true);
@@ -476,24 +702,10 @@ public class MemberDashboard extends JFrame {
                     ? cbPackage.getSelectedItem().toString() : "MONTHLY";
             double amt = memberService.calculateAmount(tier, pkg);
 
-            // Build renewal request object and submit via service
-            // Service inserts into registration_request with type = RENEWAL
-            RegistrationRequest req = new RegistrationRequest();
-            req.setMemberId(member.getMemberId());
-            req.setType("RENEWAL");
-            req.setTier(tier);
-            req.setPackageType(pkg);
-            req.setAmount(amt);
-            req.setExpiresAt(LocalDateTime.now().plusDays(3));
-
-            try {
-                memberService.submitRegistrationRequest(req);
-                JOptionPane.showMessageDialog(dialog,
-                        "Renewal request submitted! Manager will approve within 3 days.");
-                dialog.dispose();
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(dialog, "Error: " + ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
+            if (rbOnline.isSelected()) {
+                handleOnlineRenewal(dialog, tier, pkg, amt);
+            } else {
+                handleCashRenewal(dialog, tier, pkg, amt);
             }
         });
 
@@ -501,16 +713,66 @@ public class MemberDashboard extends JFrame {
         dialog.setVisible(true);
     }
 
+    private void handleCashRenewal(JDialog dialog, String tier, String pkg, double amt) {
+        RegistrationRequest req = new RegistrationRequest();
+        req.setMemberId(member.getMemberId());
+        req.setType("RENEWAL");
+        req.setTier(tier);
+        req.setPackageType(pkg);
+        req.setAmount(amt);
+        req.setExpiresAt(LocalDateTime.now().plusDays(3));
+
+        try {
+            memberService.submitRegistrationRequest(req);
+            JOptionPane.showMessageDialog(dialog,
+                    "Renewal request submitted!\n" +
+                            "Please pay " + String.format("%.2f TL", amt) + " in cash at the club.\n" +
+                            "Manager will approve within 3 days.");
+            dialog.dispose();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(dialog, "Error: " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleOnlineRenewal(JDialog dialog, String tier, String pkg, double amt) {
+        String purpose = "Renewal: " + tier + " - " + pkg;
+        PaymentResult result = MockPaymentDialog.showAndProcess(dialog, amt, purpose);
+
+        if (result == PaymentResult.CANCELLED) return;
+
+        if (!result.isSuccess()) {
+            JOptionPane.showMessageDialog(dialog,
+                    MockPaymentDialog.describe(result) + "\n\nRenewal was not processed.",
+                    "Payment Failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        try {
+            memberService.selfRenewMembership(member.getMemberId(), tier, pkg);
+            member.setStatus("ACTIVE");
+            JOptionPane.showMessageDialog(dialog,
+                    "Membership renewed successfully!\n\n" +
+                            "Your " + tier + " - " + pkg + " membership is now active.",
+                    "Renewal Complete", JOptionPane.INFORMATION_MESSAGE);
+            dialog.dispose();
+            refreshMembershipTab();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(dialog,
+                    "Payment was processed but renewal failed:\n" + ex.getMessage()
+                            + "\n\nPlease contact the club for assistance.",
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     // --- Payments Tab ---
 
-    // Builds the payment history panel — read-only table of all member payments
     private JPanel buildPaymentsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        String[] cols = {"ID", "Amount", "Date", "Type", "Description", "Status"};
-        javax.swing.table.DefaultTableModel model =
-                new javax.swing.table.DefaultTableModel(cols, 0) {
-                    public boolean isCellEditable(int r, int c) { return false; }
-                };
+        String[] cols = {"PaymentID", "Amount", "Date", "Type", "Description", "Method", "Status"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
         for (Payment p : memberService.getPaymentsByMember(member.getMemberId())) {
             model.addRow(new Object[]{
                     p.getPaymentId(),
@@ -518,16 +780,166 @@ public class MemberDashboard extends JFrame {
                     p.getPaymentDate().toLocalDate(),
                     p.getPaymentType(),
                     p.getDescription(),
+                    p.getPaymentMethod() != null ? p.getPaymentMethod() : "-",
                     p.getStatus()
             });
         }
         JTable table = new JTable(model);
         table.getTableHeader().setReorderingAllowed(false);
+        table.removeColumn(table.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
         return panel;
     }
 
-    // Helper: creates a non-editable text field with grey background
+    // --- Installments Tab (Batch 4) ---
+    // Lists every installment for the member with a "Pay Now" action on
+    // PENDING and OVERDUE rows. PAID rows show a checkmark and the date paid.
+
+    private JPanel buildInstallmentsPanel() {
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // installment_id at column 0 (hidden in view) so the Pay Now action can read it
+        String[] cols = {"InstID", "#", "Due Date", "Amount", "Status", "Paid On"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(model);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.getTableHeader().setReorderingAllowed(false);
+        table.removeColumn(table.getColumnModel().getColumn(0));
+        // Color OVERDUE rows red so the eye is drawn to them immediately
+        table.setDefaultRenderer(Object.class, new javax.swing.table.DefaultTableCellRenderer() {
+            @Override
+            public java.awt.Component getTableCellRendererComponent(
+                    JTable tbl, Object value, boolean isSelected, boolean hasFocus,
+                    int row, int col) {
+                java.awt.Component comp = super.getTableCellRendererComponent(
+                        tbl, value, isSelected, hasFocus, row, col);
+                String status = String.valueOf(model.getValueAt(row, 4));
+                if (!isSelected) {
+                    if ("OVERDUE".equals(status)) {
+                        comp.setBackground(new Color(255, 220, 220));
+                    } else if ("PAID".equals(status)) {
+                        comp.setBackground(new Color(220, 250, 220));
+                    } else {
+                        comp.setBackground(Color.WHITE);
+                    }
+                }
+                return comp;
+            }
+        });
+
+        Runnable load = () -> {
+            model.setRowCount(0);
+            // Refresh OVERDUE flags before reading so display is up to date
+            memberService.markOverdueInstallments();
+            List<Installment> all = memberService.getInstallmentsForMember(member.getMemberId());
+            for (Installment inst : all) {
+                model.addRow(new Object[]{
+                        inst.getInstallmentId(),
+                        inst.getInstallmentNo(),
+                        inst.getDueDate(),
+                        String.format("%.2f TL", inst.getAmount().doubleValue()),
+                        inst.getStatus(),
+                        inst.getPaidDate() != null
+                                ? inst.getPaidDate().toLocalDate().toString() : "-"
+                });
+            }
+        };
+        load.run();
+
+        // Header summary — shows totals at a glance
+        JLabel lblSummary = new JLabel();
+        lblSummary.setFont(new Font("Arial", Font.BOLD, 12));
+        Runnable updateSummary = () -> {
+            List<Installment> all = memberService.getInstallmentsForMember(member.getMemberId());
+            long paid    = all.stream().filter(i -> "PAID".equals(i.getStatus())).count();
+            long overdue = all.stream().filter(i -> "OVERDUE".equals(i.getStatus())).count();
+            long pending = all.stream().filter(i -> "PENDING".equals(i.getStatus())).count();
+            lblSummary.setText(String.format(
+                    "Paid: %d   |   Pending: %d   |   Overdue: %d",
+                    paid, pending, overdue));
+            lblSummary.setForeground(overdue > 0
+                    ? new Color(180, 50, 50)
+                    : new Color(33, 87, 141));
+        };
+        updateSummary.run();
+
+        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        toolbar.add(lblSummary);
+        panel.add(toolbar, BorderLayout.NORTH);
+        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // Pay Now button — enabled only when a PENDING/OVERDUE row is selected
+        JButton btnPay = new JButton("Pay Now");
+        btnPay.setBackground(new Color(33, 120, 80));
+        btnPay.setForeground(Color.WHITE);
+        btnPay.setOpaque(true);
+        btnPay.setBorderPainted(false);
+        btnPay.setEnabled(false);
+
+        JButton btnRefresh = new JButton("Refresh");
+
+        table.getSelectionModel().addListSelectionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row < 0) { btnPay.setEnabled(false); return; }
+            String status = (String) model.getValueAt(row, 4);
+            btnPay.setEnabled("PENDING".equals(status) || "OVERDUE".equals(status));
+        });
+
+        btnPay.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row < 0) return;
+            int instId = (int) model.getValueAt(row, 0);
+            int instNo = (int) model.getValueAt(row, 1);
+            String amountStr = (String) model.getValueAt(row, 3);
+            // Parse "1234.56 TL" → 1234.56
+            double amount = Double.parseDouble(amountStr.replace(" TL", ""));
+
+            String purpose = "Installment #" + instNo + "/12";
+            PaymentResult result = MockPaymentDialog.showAndProcess(this, amount, purpose);
+
+            if (result == PaymentResult.CANCELLED) return;
+
+            if (!result.isSuccess()) {
+                JOptionPane.showMessageDialog(this,
+                        MockPaymentDialog.describe(result)
+                                + "\n\nThe installment was not paid.",
+                        "Payment Failed", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            try {
+                memberService.payInstallment(instId);
+                JOptionPane.showMessageDialog(this,
+                        "Installment #" + instNo + " paid successfully.",
+                        "Payment Successful", JOptionPane.INFORMATION_MESSAGE);
+                load.run();
+                updateSummary.run();
+                btnPay.setEnabled(false);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this,
+                        "Payment processed but database update failed:\n" + ex.getMessage()
+                                + "\n\nPlease contact the club.",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        btnRefresh.addActionListener(e -> {
+            load.run();
+            updateSummary.run();
+        });
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        actions.add(btnRefresh);
+        actions.add(btnPay);
+        panel.add(actions, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
     private JTextField readOnly(String value) {
         JTextField field = new JTextField(value);
         field.setEditable(false);

@@ -4,38 +4,34 @@ import com.iscms.model.Member;
 import com.iscms.util.DBConnection;
 
 import java.sql.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-// All SQL operations for the member table live here
-// Service layer never touches SQL — only calls this via the MemberDAO interface
+// All SQL operations for the member table live here.
+// Batch 4 adds three new operations supporting the cancellation lifecycle:
+//   setCancellationRequested, clearCancellationRequested, setPassiveSince
+// plus findPassiveOlderThan for the 1-year auto-delete check.
 public class MemberDAOImpl implements MemberDAO {
 
-    // Helper method to get the shared database connection from the Singleton DBConnection
     private Connection getConn() throws SQLException {
         return DBConnection.getInstance().getConnection();
     }
 
-    // Inserts a new member record into the database
-    // failed_attempts, is_locked, created_at are omitted — DB sets defaults automatically
-    // Uses setObject() for nullable Double fields (weight, height, bmi) — maps null correctly
     @Override
     public void insert(Member m) {
-        String sql = "INSERT INTO member (full_name, date_of_birth, gender, phone, email, " +
-                "password, weight, height, bmi_value, bmi_category, " +
-                "emergency_contact_name, emergency_contact_phone, status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO member (full_name, date_of_birth, gender, phone, email, "
+                + "password, weight, height, bmi_value, bmi_category, "
+                + "emergency_contact_name, emergency_contact_phone, status) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = getConn(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, m.getFullName());
-            // Convert Java LocalDate → SQL Date
             ps.setDate(2, Date.valueOf(m.getDateOfBirth()));
             ps.setString(3, m.getGender());
             ps.setString(4, m.getPhone());
             ps.setString(5, m.getEmail());
-            // Password must already be BCrypt-hashed before calling this method
             ps.setString(6, m.getPassword());
-            // setObject() handles null correctly for nullable Double fields
             ps.setObject(7, m.getWeight());
             ps.setObject(8, m.getHeight());
             ps.setObject(9, m.getBmiValue());
@@ -49,8 +45,6 @@ public class MemberDAOImpl implements MemberDAO {
         }
     }
 
-    // Updates a member's phone number
-    // Called only after uniqueness check in service layer
     @Override
     public void updatePhone(int memberId, String phone) {
         String sql = "UPDATE member SET phone = ? WHERE member_id = ?";
@@ -63,7 +57,6 @@ public class MemberDAOImpl implements MemberDAO {
         }
     }
 
-    // Finds a member by phone number — used during login and duplicate phone validation
     @Override
     public Optional<Member> findByPhone(String phone) {
         String sql = "SELECT * FROM member WHERE phone = ?";
@@ -78,7 +71,6 @@ public class MemberDAOImpl implements MemberDAO {
         return Optional.empty();
     }
 
-    // Finds a member by email address — used during login and duplicate email validation
     @Override
     public Optional<Member> findByEmail(String email) {
         String sql = "SELECT * FROM member WHERE email = ?";
@@ -93,7 +85,6 @@ public class MemberDAOImpl implements MemberDAO {
         return Optional.empty();
     }
 
-    // Finds a member by their ID — returns Optional.empty() if not found
     @Override
     public Optional<Member> findById(int memberId) {
         String sql = "SELECT * FROM member WHERE member_id = ?";
@@ -108,8 +99,6 @@ public class MemberDAOImpl implements MemberDAO {
         return Optional.empty();
     }
 
-    // Returns all member records ordered alphabetically by full name
-    // Used in manager dashboard member list
     @Override
     public List<Member> findAll() {
         List<Member> list = new ArrayList<>();
@@ -124,8 +113,6 @@ public class MemberDAOImpl implements MemberDAO {
         return list;
     }
 
-    // Returns all members with a given status (e.g., ACTIVE, FROZEN, SUSPENDED, PENDING)
-    // Used for filtered views in manager dashboard and report panels
     @Override
     public List<Member> findByStatus(String status) {
         List<Member> list = new ArrayList<>();
@@ -141,8 +128,6 @@ public class MemberDAOImpl implements MemberDAO {
         return list;
     }
 
-    // Updates the account status of a member
-    // Valid values: ACTIVE, PASSIVE, SUSPENDED, PENDING, REGISTRATION_FAILED, FROZEN
     @Override
     public void updateStatus(int memberId, String status) {
         String sql = "UPDATE member SET status = ? WHERE member_id = ?";
@@ -155,8 +140,6 @@ public class MemberDAOImpl implements MemberDAO {
         }
     }
 
-    // Updates the failed login attempt count for a member
-    // Called after each failed login — lockout triggered at threshold
     @Override
     public void updateFailedAttempts(int memberId, int attempts) {
         String sql = "UPDATE member SET failed_attempts = ? WHERE member_id = ?";
@@ -169,8 +152,6 @@ public class MemberDAOImpl implements MemberDAO {
         }
     }
 
-    // Locks or unlocks a member account
-    // true = locked (cannot log in), false = unlocked
     @Override
     public void updateLockStatus(int memberId, boolean locked) {
         String sql = "UPDATE member SET is_locked = ? WHERE member_id = ?";
@@ -183,13 +164,10 @@ public class MemberDAOImpl implements MemberDAO {
         }
     }
 
-    // Updates the BMI value and category for a member
-    // bmi_updated_at is set to current timestamp by DB automatically
-    // Called after member updates weight or height
     @Override
     public void updateBmi(int memberId, double bmiValue, String bmiCategory) {
-        String sql = "UPDATE member SET bmi_value = ?, bmi_category = ?, " +
-                "bmi_updated_at = CURRENT_TIMESTAMP WHERE member_id = ?";
+        String sql = "UPDATE member SET bmi_value = ?, bmi_category = ?, "
+                + "bmi_updated_at = CURRENT_TIMESTAMP WHERE member_id = ?";
         try (Connection conn = getConn(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setDouble(1, bmiValue);
             ps.setString(2, bmiCategory);
@@ -200,15 +178,12 @@ public class MemberDAOImpl implements MemberDAO {
         }
     }
 
-    // Updates editable profile fields for a member
-    // Uses setObject() for nullable Double fields (weight, height)
-    // Phone and email are updated via dedicated methods
     @Override
     public void updateProfile(int memberId, Double weight, Double height,
                               String ecName, String ecPhone) {
-        String sql = "UPDATE member SET weight = ?, height = ?, " +
-                "emergency_contact_name = ?, emergency_contact_phone = ? " +
-                "WHERE member_id = ?";
+        String sql = "UPDATE member SET weight = ?, height = ?, "
+                + "emergency_contact_name = ?, emergency_contact_phone = ? "
+                + "WHERE member_id = ?";
         try (Connection conn = getConn(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, weight);
             ps.setObject(2, height);
@@ -221,13 +196,10 @@ public class MemberDAOImpl implements MemberDAO {
         }
     }
 
-    // Resets a member's password and clears lockout state in a single operation
-    // Also resets failed_attempts to 0 and unlocks the account (is_locked = 0)
-    // Ensures a member can log in immediately after resetting their password
     @Override
     public void resetPassword(int memberId, String hashedPassword) {
-        String sql = "UPDATE member SET password = ?, failed_attempts = 0, " +
-                "is_locked = 0 WHERE member_id = ?";
+        String sql = "UPDATE member SET password = ?, failed_attempts = 0, "
+                + "is_locked = 0 WHERE member_id = ?";
         try (Connection conn = getConn(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, hashedPassword);
             ps.setInt(2, memberId);
@@ -237,7 +209,6 @@ public class MemberDAOImpl implements MemberDAO {
         }
     }
 
-    // Checks whether a phone number is already registered — used for duplicate validation
     @Override
     public boolean existsByPhone(String phone) {
         String sql = "SELECT COUNT(*) FROM member WHERE phone = ?";
@@ -252,7 +223,6 @@ public class MemberDAOImpl implements MemberDAO {
         return false;
     }
 
-    // Checks whether an email is already registered — used for duplicate validation
     @Override
     public boolean existsByEmail(String email) {
         String sql = "SELECT COUNT(*) FROM member WHERE email = ?";
@@ -267,46 +237,6 @@ public class MemberDAOImpl implements MemberDAO {
         return false;
     }
 
-    // Maps a single ResultSet row to a Member object
-    // Handles nullable fields: weight, height, bmi_value, bmi_updated_at
-    private Member mapRow(ResultSet rs) throws SQLException {
-        Member m = new Member();
-        m.setMemberId(rs.getInt("member_id"));
-        m.setFullName(rs.getString("full_name"));
-        // Convert SQL Date → Java LocalDate
-        m.setDateOfBirth(rs.getDate("date_of_birth").toLocalDate());
-        m.setGender(rs.getString("gender"));
-        m.setPhone(rs.getString("phone"));
-        m.setEmail(rs.getString("email"));
-        m.setPassword(rs.getString("password"));
-        m.setStatus(rs.getString("status"));
-        m.setFailedAttempts(rs.getInt("failed_attempts"));
-        m.setLocked(rs.getBoolean("is_locked"));
-
-        // Nullable double fields: must use wasNull() check after getDouble()
-        // getDouble() returns 0.0 for NULL — wasNull() distinguishes 0.0 from actual NULL
-        double weight = rs.getDouble("weight");
-        if (!rs.wasNull()) m.setWeight(weight);
-        double height = rs.getDouble("height");
-        if (!rs.wasNull()) m.setHeight(height);
-        double bmi = rs.getDouble("bmi_value");
-        if (!rs.wasNull()) m.setBmiValue(bmi);
-
-        m.setBmiCategory(rs.getString("bmi_category"));
-        m.setEmergencyContactName(rs.getString("emergency_contact_name"));
-        m.setEmergencyContactPhone(rs.getString("emergency_contact_phone"));
-
-        // bmi_updated_at is nullable — only set if member has calculated BMI
-        Timestamp bmiTs = rs.getTimestamp("bmi_updated_at");
-        if (bmiTs != null) m.setBmiUpdatedAt(bmiTs.toLocalDateTime());
-
-        // Convert SQL Timestamp → Java LocalDateTime
-        m.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
-        return m;
-    }
-
-    // Updates a member's email address
-    // Called only after uniqueness check in service layer
     @Override
     public void updateEmail(int memberId, String email) {
         String sql = "UPDATE member SET email = ? WHERE member_id = ?";
@@ -319,17 +249,114 @@ public class MemberDAOImpl implements MemberDAO {
         }
     }
 
-    // Deletes a member record by ID
-    // Use with caution — cascading FK constraints may affect related records
     @Override
     public void deleteById(int memberId) {
         String sql = "DELETE FROM member WHERE member_id = ?";
-        try (Connection conn = getConn();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConn(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, memberId);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("deleteById failed: " + e.getMessage(), e);
         }
+    }
+
+    // === Batch 4 — cancellation lifecycle methods ===
+
+    @Override
+    public void setCancellationRequested(int memberId, LocalDateTime when) {
+        String sql = "UPDATE member SET cancellation_requested_at = ? WHERE member_id = ?";
+        try (Connection conn = getConn(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setTimestamp(1, Timestamp.valueOf(when));
+            ps.setInt(2, memberId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("setCancellationRequested failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void clearCancellationRequested(int memberId) {
+        String sql = "UPDATE member SET cancellation_requested_at = NULL WHERE member_id = ?";
+        try (Connection conn = getConn(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, memberId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("clearCancellationRequested failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void setPassiveSince(int memberId, LocalDateTime when) {
+        // Pass null when=null to clear (member returns to ACTIVE on renewal)
+        String sql = "UPDATE member SET passive_since = ? WHERE member_id = ?";
+        try (Connection conn = getConn(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (when != null) ps.setTimestamp(1, Timestamp.valueOf(when));
+            else              ps.setNull(1, Types.TIMESTAMP);
+            ps.setInt(2, memberId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("setPassiveSince failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<Member> findPassiveOlderThan(LocalDateTime cutoff) {
+        // Returns PASSIVE members whose passive_since is non-null and older than cutoff.
+        // The caller (login-trigger expirer) iterates and calls deleteById on each.
+        List<Member> list = new ArrayList<>();
+        String sql = "SELECT * FROM member "
+                + "WHERE status = 'PASSIVE' "
+                + "AND passive_since IS NOT NULL "
+                + "AND passive_since < ?";
+        try (Connection conn = getConn(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setTimestamp(1, Timestamp.valueOf(cutoff));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) list.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("findPassiveOlderThan failed: " + e.getMessage(), e);
+        }
+        return list;
+    }
+
+    // Maps a single ResultSet row to a Member object — now also reads the
+    // bmi_updated_at, cancellation_requested_at, and passive_since columns.
+    private Member mapRow(ResultSet rs) throws SQLException {
+        Member m = new Member();
+        m.setMemberId(rs.getInt("member_id"));
+        m.setFullName(rs.getString("full_name"));
+        m.setDateOfBirth(rs.getDate("date_of_birth").toLocalDate());
+        m.setGender(rs.getString("gender"));
+        m.setPhone(rs.getString("phone"));
+        m.setEmail(rs.getString("email"));
+        m.setPassword(rs.getString("password"));
+        m.setStatus(rs.getString("status"));
+        m.setFailedAttempts(rs.getInt("failed_attempts"));
+        m.setLocked(rs.getBoolean("is_locked"));
+
+        double weight = rs.getDouble("weight");
+        if (!rs.wasNull()) m.setWeight(weight);
+        double height = rs.getDouble("height");
+        if (!rs.wasNull()) m.setHeight(height);
+        double bmi = rs.getDouble("bmi_value");
+        if (!rs.wasNull()) m.setBmiValue(bmi);
+
+        m.setBmiCategory(rs.getString("bmi_category"));
+        m.setEmergencyContactName(rs.getString("emergency_contact_name"));
+        m.setEmergencyContactPhone(rs.getString("emergency_contact_phone"));
+
+        Timestamp bmiTs = rs.getTimestamp("bmi_updated_at");
+        if (bmiTs != null) m.setBmiUpdatedAt(bmiTs.toLocalDateTime());
+
+        m.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+
+        // === Batch 4 fields ===
+        Timestamp cancelTs = rs.getTimestamp("cancellation_requested_at");
+        if (cancelTs != null) m.setCancellationRequestedAt(cancelTs.toLocalDateTime());
+
+        Timestamp passiveTs = rs.getTimestamp("passive_since");
+        if (passiveTs != null) m.setPassiveSince(passiveTs.toLocalDateTime());
+
+        return m;
     }
 }

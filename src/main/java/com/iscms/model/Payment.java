@@ -2,63 +2,48 @@ package com.iscms.model;
 
 import java.time.LocalDateTime;
 
-// Model class representing a payment record in the system (POJO)
-// Maps to the payment table in the database
+// Represents a single payment record. Used for membership payments, tier upgrades,
+// and individual installment payments. The payment_method column distinguishes
+// CASH (manager-recorded at the club) from ONLINE (mock card payment by the member).
+// installment_id, when non-null, links a payment to the specific installment it cleared.
 public class Payment {
 
-    // Unique identifier for this payment record (maps to payment_id in DB)
-    private int paymentId;
-
-    // ID of the member who made this payment (FK → member table)
-    private int memberId;
-
-    // Payment amount — primitive double because amount can never be null
-    private double amount;
-
-    // Timestamp of when the payment was made
+    private int           paymentId;
+    private int           memberId;        // 0 when member has been deleted (FK SET NULL → reads as 0)
+    private double        amount;
     private LocalDateTime paymentDate;
+    private String        paymentType;     // MEMBERSHIP | UPGRADE | INSTALLMENT
+    private String        description;
+    private String        status;          // PAID | PENDING | FAILED
+    private int           recordedBy;      // 0 means online self-payment (no manager involved)
 
-    // Type of payment: MEMBERSHIP (new/renewal) or UPGRADE (tier upgrade)
-    private String paymentType;
+    // Batch 4 fields
+    private String        paymentMethod;   // CASH | ONLINE
+    private Integer       installmentId;   // FK to installment if this payment cleared an installment
 
-    // Optional human-readable description of the payment
-    private String description;
+    // === Getters ===
 
-    // Current payment status: PAID or PENDING
-    private String status;
+    public int           getPaymentId()     { return paymentId; }
+    public int           getMemberId()      { return memberId; }
+    public double        getAmount()        { return amount; }
+    public LocalDateTime getPaymentDate()   { return paymentDate; }
+    public String        getPaymentType()   { return paymentType; }
+    public String        getDescription()   { return description; }
+    public String        getStatus()        { return status; }
+    public int           getRecordedBy()    { return recordedBy; }
+    public String        getPaymentMethod() { return paymentMethod; }
+    public Integer       getInstallmentId() { return installmentId; }
 
-    // ID of the manager who recorded this payment (FK → manager table)
-    // Stored as recordedBy — maps to recorded_by column in DB
-    private int recordedBy;
+    // === Setters ===
 
-    // No-arg constructor required for JDBC result mapping
-    public Payment() {}
-
-    // --- Getters and Setters ---
-
-    public int getPaymentId() { return paymentId; }
-    public void setPaymentId(int paymentId) { this.paymentId = paymentId; }
-
-    public int getMemberId() { return memberId; }
-    public void setMemberId(int memberId) { this.memberId = memberId; }
-
-    public double getAmount() { return amount; }
-    public void setAmount(double amount) { this.amount = amount; }
-
-    public LocalDateTime getPaymentDate() { return paymentDate; }
-    public void setPaymentDate(LocalDateTime paymentDate) { this.paymentDate = paymentDate; }
-
-    // Payment type determines the context: membership registration or tier upgrade
-    public String getPaymentType() { return paymentType; }
-    public void setPaymentType(String paymentType) { this.paymentType = paymentType; }
-
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-
-    // The manager who approved and recorded this payment
-    public int getRecordedBy() { return recordedBy; }
-    public void setRecordedBy(int recordedBy) { this.recordedBy = recordedBy; }
+    public void setPaymentId(int paymentId)             { this.paymentId = paymentId; }
+    public void setMemberId(int memberId)               { this.memberId = memberId; }
+    public void setAmount(double amount)                { this.amount = amount; }
+    public void setPaymentDate(LocalDateTime date)      { this.paymentDate = date; }
+    public void setPaymentType(String paymentType)      { this.paymentType = paymentType; }
+    public void setDescription(String description)      { this.description = description; }
+    public void setStatus(String status)                { this.status = status; }
+    public void setRecordedBy(int recordedBy)           { this.recordedBy = recordedBy; }
+    public void setPaymentMethod(String paymentMethod)  { this.paymentMethod = paymentMethod; }
+    public void setInstallmentId(Integer installmentId) { this.installmentId = installmentId; }
 }

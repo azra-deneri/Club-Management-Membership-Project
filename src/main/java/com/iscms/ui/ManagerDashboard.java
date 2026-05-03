@@ -1,6 +1,7 @@
 package com.iscms.ui;
 
 import com.iscms.model.*;
+import com.iscms.service.AuthService;
 import com.iscms.service.MemberService;
 import com.iscms.service.PTService;
 
@@ -12,16 +13,14 @@ import java.util.*;
 import java.util.List;
 
 // Manager dashboard — accessible by users with MANAGER role
-// Provides 6 tabs: Members, Add Member, Requests, Events, Trainers & PT, Reports
+// Provides 7 tabs: Members, Add Member, Requests, Events, Trainers & PT, Reports, My Profile
 public class ManagerDashboard extends JFrame {
 
-    // The currently logged-in manager
     private final Manager manager;
 
-    // Service instance — no DAOs directly in UI layer
     private final MemberService memberService = new MemberService();
+    private final AuthService   authService   = new AuthService();
 
-    // Table and model for the member list tab
     private JTable memberTable;
     private DefaultTableModel tableModel;
     private JTextField txtSearch;
@@ -36,7 +35,6 @@ public class ManagerDashboard extends JFrame {
         loadMembers();
     }
 
-    // Builds the main layout: top bar + tabbed pane with 6 tabs
     private void initUI() {
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(new Color(33, 87, 141));
@@ -47,7 +45,6 @@ public class ManagerDashboard extends JFrame {
         lblTitle.setFont(new Font("Arial", Font.BOLD, 14));
         topBar.add(lblTitle, BorderLayout.WEST);
 
-        // Logout button — closes dashboard and opens login screen
         JButton btnLogout = new JButton("Logout");
         btnLogout.setBackground(new Color(180, 50, 50));
         btnLogout.setForeground(Color.WHITE);
@@ -60,7 +57,6 @@ public class ManagerDashboard extends JFrame {
         topBar.add(right, BorderLayout.EAST);
         add(topBar, BorderLayout.NORTH);
 
-        // Six main tabs — Events tab reuses EventManagementPanel, Reports reuses ReportsPanel
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Members",       buildMembersPanel());
         tabs.addTab("Add Member",    buildAddMemberPanel());
@@ -68,12 +64,12 @@ public class ManagerDashboard extends JFrame {
         tabs.addTab("Events",        new EventManagementPanel(manager));
         tabs.addTab("Trainers & PT", buildTrainersPTPanel());
         tabs.addTab("Reports",       new ReportsPanel());
+        tabs.addTab("My Profile",    buildMyProfilePanel());
         add(tabs, BorderLayout.CENTER);
     }
 
     // --- Members Tab ---
 
-    // Builds the member list panel with search, suspend, and unlock actions
     private JPanel buildMembersPanel() {
         JPanel panel = new JPanel(new BorderLayout());
 
@@ -97,7 +93,6 @@ public class ManagerDashboard extends JFrame {
         toolbar.add(btnUnlock);
         panel.add(toolbar, BorderLayout.NORTH);
 
-        // Non-editable member table
         String[] cols = {"ID", "Full Name", "Phone", "Email", "Status", "Tier", "Created"};
         tableModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
@@ -105,6 +100,7 @@ public class ManagerDashboard extends JFrame {
         memberTable = new JTable(tableModel);
         memberTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         memberTable.getTableHeader().setReorderingAllowed(false);
+        memberTable.removeColumn(memberTable.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(memberTable), BorderLayout.CENTER);
 
         btnRefresh.addActionListener(e -> loadMembers());
@@ -115,7 +111,6 @@ public class ManagerDashboard extends JFrame {
         return panel;
     }
 
-    // Loads all members and resolves their active membership tier for display
     private void loadMembers() {
         tableModel.setRowCount(0);
         for (Member m : memberService.getAllMembers()) {
@@ -130,7 +125,6 @@ public class ManagerDashboard extends JFrame {
         }
     }
 
-    // Filters the member table by name or phone number
     private void searchMembers() {
         String query = txtSearch.getText().trim().toLowerCase();
         tableModel.setRowCount(0);
@@ -148,7 +142,6 @@ public class ManagerDashboard extends JFrame {
         }
     }
 
-    // Suspends the selected member after confirmation
     private void suspendMember() {
         int row = memberTable.getSelectedRow();
         if (row < 0) { JOptionPane.showMessageDialog(this, "Please select a member."); return; }
@@ -161,7 +154,6 @@ public class ManagerDashboard extends JFrame {
         }
     }
 
-    // Unlocks the selected member account and resets failed attempt counter
     private void unlockMember() {
         int row = memberTable.getSelectedRow();
         if (row < 0) { JOptionPane.showMessageDialog(this, "Please select a member."); return; }
@@ -171,8 +163,12 @@ public class ManagerDashboard extends JFrame {
     }
 
     // --- Add Member Tab ---
+    // Manager registers a member directly with cash payment. ANNUAL_INSTALLMENT
+    // is intentionally not offered here — installment requires the online flow
+    // (only the member can self-register with online payment). Cash + installment
+    // would create an installment schedule with no online "Pay Now" path for
+    // future months, which doesn't match the rest of the system.
 
-    // Builds the direct member registration form — manager adds member without approval flow
     private JPanel buildAddMemberPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(20, 50, 20, 50));
@@ -187,8 +183,9 @@ public class ManagerDashboard extends JFrame {
         JTextField txtEmail    = new JTextField(20);
         JPasswordField txtPass = new JPasswordField(20);
         JComboBox<String> cbTier    = new JComboBox<>(new String[]{"CLASSIC", "GOLD", "VIP"});
+        // ANNUAL_INSTALLMENT removed from this combo — online flow only
         JComboBox<String> cbPackage = new JComboBox<>(
-                new String[]{"MONTHLY", "ANNUAL_INSTALLMENT", "ANNUAL_PREPAID"});
+                new String[]{"MONTHLY", "ANNUAL_PREPAID"});
 
         String[] labels    = {"Full Name *", "Date of Birth * (YYYY-MM-DD)", "Gender *",
                 "Phone * (10 digits)", "Email *", "Password *", "Tier *", "Package *"};
@@ -202,12 +199,18 @@ public class ManagerDashboard extends JFrame {
             panel.add(inputs[i], c);
         }
 
+        JLabel lblHint = new JLabel(
+                "<html><i>Note: For installment plans, the member must self-register online.</i></html>");
+        lblHint.setForeground(new Color(100, 100, 100));
+        c.gridx = 0; c.gridy = inputs.length; c.gridwidth = 2;
+        panel.add(lblHint, c);
+
         JButton btnSave = new JButton("Add Member");
         btnSave.setBackground(new Color(33, 87, 141));
         btnSave.setForeground(Color.WHITE);
         btnSave.setOpaque(true);
         btnSave.setBorderPainted(false);
-        c.gridx = 0; c.gridy = inputs.length; c.gridwidth = 2;
+        c.gridy = inputs.length + 1;
         panel.add(btnSave, c);
 
         btnSave.addActionListener(e -> {
@@ -219,14 +222,12 @@ public class ManagerDashboard extends JFrame {
                 m.setPhone(txtPhone.getText().trim());
                 m.setEmail(txtEmail.getText().trim());
                 m.setPassword(new String(txtPass.getPassword()));
-                // Validation, hashing, membership and payment creation handled in service
                 memberService.registerMember(m,
                         (String) cbTier.getSelectedItem(),
                         (String) cbPackage.getSelectedItem(),
                         manager.getManagerId());
                 JOptionPane.showMessageDialog(panel, "Member added successfully!");
                 loadMembers();
-                // Clear form fields after successful add
                 txtName.setText(""); txtDob.setText("YYYY-MM-DD");
                 txtPhone.setText(""); txtEmail.setText(""); txtPass.setText("");
             } catch (Exception ex) {
@@ -240,7 +241,6 @@ public class ManagerDashboard extends JFrame {
 
     // --- Requests Tab ---
 
-    // Builds the requests tab with two sub-tabs: registrations and tier upgrades
     private JPanel buildRequestsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         JTabbedPane subTabs = new JTabbedPane();
@@ -250,26 +250,25 @@ public class ManagerDashboard extends JFrame {
         return panel;
     }
 
-    // Builds the registration request approval panel
-    // Calls expireOldRequests() on load to ensure expired requests are marked before display
     private JPanel buildRegistrationRequestsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        String[] cols = {"Req ID", "Member ID", "Type", "Tier", "Package", "Amount", "Status", "Expires"};
+        String[] cols = {"ReqID", "Member", "Type", "Tier", "Package", "Amount", "Status", "Expires"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         JTable table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.removeColumn(table.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
-        // Runnable used to refresh table data — reused by buttons and initial load
         Runnable load = () -> {
             model.setRowCount(0);
-            // Expire outdated requests before displaying
             memberService.expireOldRequests();
             for (RegistrationRequest r : memberService.getAllRegistrations()) {
+                String memberName = memberService.getMemberById(r.getMemberId())
+                        .map(Member::getFullName).orElse("(deleted)");
                 model.addRow(new Object[]{
-                        r.getRequestId(), r.getMemberId(), r.getType(), r.getTier(),
+                        r.getRequestId(), memberName, r.getType(), r.getTier(),
                         r.getPackageType(), String.format("%.2f TL", r.getAmount()),
                         r.getStatus(), r.getExpiresAt().toLocalDate()
                 });
@@ -294,10 +293,14 @@ public class ManagerDashboard extends JFrame {
         btnApprove.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) { JOptionPane.showMessageDialog(panel, "Please select a request."); return; }
-            // Approval creates membership and payment records in service layer
-            memberService.approveRegistration((int) model.getValueAt(row, 0), manager.getManagerId());
-            JOptionPane.showMessageDialog(panel, "Registration approved.");
-            load.run();
+            try {
+                memberService.approveRegistration((int) model.getValueAt(row, 0), manager.getManagerId());
+                JOptionPane.showMessageDialog(panel, "Registration approved.");
+                load.run();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(panel, ex.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
         });
         btnReject.addActionListener(e -> {
             int row = table.getSelectedRow();
@@ -310,22 +313,24 @@ public class ManagerDashboard extends JFrame {
         return panel;
     }
 
-    // Builds the tier upgrade request approval panel
     private JPanel buildTierUpgradeRequestsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        String[] cols = {"Req ID", "Member ID", "Old Tier", "New Tier", "Fee", "Status", "Expires"};
+        String[] cols = {"ReqID", "Member", "Old Tier", "New Tier", "Fee", "Status", "Expires"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         JTable table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.removeColumn(table.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
         Runnable load = () -> {
             model.setRowCount(0);
             for (TierUpgradeRequest r : memberService.getAllTierUpgrades()) {
+                String memberName = memberService.getMemberById(r.getMemberId())
+                        .map(Member::getFullName).orElse("(deleted)");
                 model.addRow(new Object[]{
-                        r.getRequestId(), r.getMemberId(), r.getOldTier(), r.getNewTier(),
+                        r.getRequestId(), memberName, r.getOldTier(), r.getNewTier(),
                         String.format("%.2f TL", r.getUpgradeFee()),
                         r.getStatus(), r.getExpiresAt().toLocalDate()
                 });
@@ -350,10 +355,14 @@ public class ManagerDashboard extends JFrame {
         btnApprove.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) { JOptionPane.showMessageDialog(panel, "Please select a request."); return; }
-            // Approval updates tier, package type, end date, and records payment in service
-            memberService.approveTierUpgrade((int) model.getValueAt(row, 0), manager.getManagerId());
-            JOptionPane.showMessageDialog(panel, "Tier upgrade approved.");
-            load.run();
+            try {
+                memberService.approveTierUpgrade((int) model.getValueAt(row, 0), manager.getManagerId());
+                JOptionPane.showMessageDialog(panel, "Tier upgrade approved.");
+                load.run();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(panel, ex.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
         });
         btnReject.addActionListener(e -> {
             int row = table.getSelectedRow();
@@ -368,7 +377,6 @@ public class ManagerDashboard extends JFrame {
 
     // --- Trainers & PT Tab ---
 
-    // Builds the Trainers & PT tab with two sub-tabs: trainer list and all appointments
     private JPanel buildTrainersPTPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         JTabbedPane subTabs = new JTabbedPane();
@@ -378,8 +386,6 @@ public class ManagerDashboard extends JFrame {
         return panel;
     }
 
-    // Builds the trainer management sub-panel
-    // Supports: add, edit, activate/deactivate, unlock trainer accounts
     private JPanel buildTrainersSubPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         String[] cols = {"ID", "Full Name", "Username", "Specialty", "Active", "Status"};
@@ -404,6 +410,7 @@ public class ManagerDashboard extends JFrame {
         JTable table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.getTableHeader().setReorderingAllowed(false);
+        table.removeColumn(table.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -430,7 +437,6 @@ public class ManagerDashboard extends JFrame {
 
         btnRefresh.addActionListener(e -> loadTrainers.run());
 
-        // Add trainer form shown in a JOptionPane dialog
         btnAdd.addActionListener(e -> {
             JTextField txtName      = new JTextField(20);
             JTextField txtUsername  = new JTextField(20);
@@ -439,11 +445,11 @@ public class ManagerDashboard extends JFrame {
             JTextField txtSpecialty = new JTextField(20);
 
             JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
-            form.add(new JLabel("Full Name *:"));  form.add(txtName);
-            form.add(new JLabel("Username *:"));   form.add(txtUsername);
-            form.add(new JLabel("Email:"));        form.add(txtEmail);
-            form.add(new JLabel("Password *:"));   form.add(txtPass);
-            form.add(new JLabel("Specialty:"));    form.add(txtSpecialty);
+            form.add(new JLabel("Full Name *:"));         form.add(txtName);
+            form.add(new JLabel("Username *:"));          form.add(txtUsername);
+            form.add(new JLabel("Email:"));               form.add(txtEmail);
+            form.add(new JLabel("Initial Password *:"));  form.add(txtPass);
+            form.add(new JLabel("Specialty:"));           form.add(txtSpecialty);
 
             int result = JOptionPane.showConfirmDialog(panel, form,
                     "Add Trainer", JOptionPane.OK_CANCEL_OPTION);
@@ -467,7 +473,6 @@ public class ManagerDashboard extends JFrame {
                 t.setPassword(pass);
                 t.setSpecialty(txtSpecialty.getText().trim());
                 t.setActive(true);
-                // Password hashing handled in PTService.addTrainer()
                 ptService.addTrainer(t);
                 JOptionPane.showMessageDialog(panel, "Trainer added successfully!");
                 loadTrainers.run();
@@ -485,7 +490,6 @@ public class ManagerDashboard extends JFrame {
             showEditTrainerDialog(trainerId, name, ptService, loadTrainers);
         });
 
-        // Toggle active status — if currently Active → deactivate, if Inactive → activate
         btnActivate.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) { JOptionPane.showMessageDialog(panel, "Please select a trainer."); return; }
@@ -506,28 +510,26 @@ public class ManagerDashboard extends JFrame {
         return panel;
     }
 
-    // Builds the all-appointments sub-panel — read-only view of all PT appointments
-    // Iterates over all trainers and fetches their appointments
     private JPanel buildAppointmentsSubPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         PTService ptService = new PTService();
 
-        String[] cols = {"ID", "Member", "Trainer", "Date", "Start", "End", "Status"};
+        String[] cols = {"AptID", "Member", "Trainer", "Date", "Start", "End", "Status"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
 
         JTable table = new JTable(model);
         table.getTableHeader().setReorderingAllowed(false);
+        table.removeColumn(table.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
         Runnable load = () -> {
             model.setRowCount(0);
             for (Trainer t : ptService.getAllTrainers()) {
                 for (PersonalTrainingAppointment apt : ptService.getTrainerAppointments(t.getTrainerId())) {
-                    // Resolve member name from ID — fallback to ID if not found
                     String memberName = memberService.getMemberById(apt.getMemberId())
-                            .map(Member::getFullName).orElse("ID:" + apt.getMemberId());
+                            .map(Member::getFullName).orElse("(deleted)");
                     model.addRow(new Object[]{
                             apt.getAppointmentId(), memberName, t.getFullName(),
                             apt.getAppointmentDate(), apt.getStartTime(),
@@ -549,12 +551,10 @@ public class ManagerDashboard extends JFrame {
 
     // --- Edit Trainer Dialog ---
 
-    // Opens a dialog to edit trainer info and set working days
-    // Password field is optional — leave blank to keep existing password
     private void showEditTrainerDialog(int trainerId, String trainerName,
                                        PTService ptService, Runnable onSave) {
         JDialog dialog = new JDialog(this, "Edit Trainer", true);
-        dialog.setSize(420, 280);
+        dialog.setSize(420, 260);
         dialog.setLocationRelativeTo(this);
 
         JPanel panel = new JPanel(new GridBagLayout());
@@ -563,18 +563,16 @@ public class ManagerDashboard extends JFrame {
         c.insets = new Insets(8, 8, 8, 8);
         c.fill = GridBagConstraints.HORIZONTAL;
 
-        // Pre-fill fields with current trainer data
         Trainer current = ptService.getAllTrainers().stream()
                 .filter(t -> t.getTrainerId() == trainerId)
                 .findFirst().orElse(new Trainer());
 
         JTextField txtName      = new JTextField(current.getFullName(), 20);
         JTextField txtUsername  = new JTextField(current.getUsername() != null ? current.getUsername() : "", 20);
-        JPasswordField txtPass  = new JPasswordField(20);
         JTextField txtSpecialty = new JTextField(current.getSpecialty() != null ? current.getSpecialty() : "", 20);
 
-        String[] labels    = {"Full Name:", "Username:", "New Password:", "Specialty:"};
-        Component[] inputs = {txtName, txtUsername, txtPass, txtSpecialty};
+        String[] labels    = {"Full Name:", "Username:", "Specialty:"};
+        Component[] inputs = {txtName, txtUsername, txtSpecialty};
 
         for (int i = 0; i < inputs.length; i++) {
             c.gridx = 0; c.gridy = i; c.weightx = 0.4;
@@ -600,13 +598,11 @@ public class ManagerDashboard extends JFrame {
 
         btnSave.addActionListener(e -> {
             try {
-                String pass = new String(txtPass.getPassword());
-                // Pass null for password to keep existing — service handles this
                 ptService.updateTrainerInfo(trainerId,
                         txtName.getText().trim(),
                         txtUsername.getText().trim(),
                         txtSpecialty.getText().trim(),
-                        pass.isEmpty() ? null : pass);
+                        null);
                 JOptionPane.showMessageDialog(dialog, "Trainer updated successfully.");
                 onSave.run();
                 dialog.dispose();
@@ -616,7 +612,6 @@ public class ManagerDashboard extends JFrame {
             }
         });
 
-        // Opens the working days dialog as a child of this dialog
         btnWorkingDays.addActionListener(e ->
                 showWorkingDaysDialog(dialog, trainerId, trainerName, ptService));
 
@@ -625,8 +620,6 @@ public class ManagerDashboard extends JFrame {
 
     // --- Working Days Dialog ---
 
-    // Opens a dialog to configure a trainer's working schedule for each day of the week
-    // Pre-fills checkboxes and time fields with existing working day data
     private void showWorkingDaysDialog(JDialog parent, int trainerId,
                                        String trainerName, PTService ptService) {
         JDialog dialog = new JDialog(parent, "Working Days — " + trainerName, true);
@@ -642,7 +635,6 @@ public class ManagerDashboard extends JFrame {
         c.insets = new Insets(4, 6, 4, 6);
         c.fill = GridBagConstraints.HORIZONTAL;
 
-        // Header row
         c.gridy = 0;
         c.gridx = 1; panel.add(new JLabel("Day"), c);
         c.gridx = 2; panel.add(new JLabel("Start (HH:MM)"), c);
@@ -652,7 +644,6 @@ public class ManagerDashboard extends JFrame {
         JTextField[] starts = new JTextField[days.length];
         JTextField[] ends   = new JTextField[days.length];
 
-        // Load existing working days into a map for quick lookup
         Map<String, TrainerWorkingDay> existing = new HashMap<>();
         for (TrainerWorkingDay wd : ptService.getWorkingDays(trainerId))
             existing.put(wd.getDayOfWeek(), wd);
@@ -660,7 +651,6 @@ public class ManagerDashboard extends JFrame {
         for (int i = 0; i < days.length; i++) {
             TrainerWorkingDay wd = existing.get(days[i]);
             checks[i] = new JCheckBox();
-            // Pre-fill times from existing data or use defaults
             starts[i] = new JTextField(wd != null ? wd.getStartTime().toString() : "09:00", 6);
             ends[i]   = new JTextField(wd != null ? wd.getEndTime().toString()   : "18:00", 6);
 
@@ -668,7 +658,6 @@ public class ManagerDashboard extends JFrame {
             starts[i].setEnabled(wd != null);
             ends[i].setEnabled(wd != null);
 
-            // Enable/disable time fields when checkbox is toggled
             int idx = i;
             checks[i].addActionListener(e -> {
                 starts[idx].setEnabled(checks[idx].isSelected());
@@ -699,7 +688,6 @@ public class ManagerDashboard extends JFrame {
         dialog.add(new JScrollPane(panel), BorderLayout.CENTER);
         dialog.add(bottom, BorderLayout.SOUTH);
 
-        // Save selected working days using delete + insert via PTService
         btnSave.addActionListener(e -> {
             try {
                 List<TrainerWorkingDay> list = new ArrayList<>();
@@ -716,168 +704,208 @@ public class ManagerDashboard extends JFrame {
                     }
                 }
                 ptService.saveWorkingDays(trainerId, list);
-                JOptionPane.showMessageDialog(dialog, "Working days saved successfully.");
+                JOptionPane.showMessageDialog(dialog, "Working days saved.");
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(dialog, "Error: " + ex.getMessage(),
                         "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
 
-        // Opens lesson slots dialog — passes current checkbox/time state to avoid re-reading from DB
         btnLessonSlots.addActionListener(e ->
-                showLessonSlotsDialog(dialog, trainerId, trainerName, ptService, days, checks, starts, ends));
+                showLessonSlotsDialog(dialog, trainerId, trainerName, ptService));
 
         dialog.setVisible(true);
     }
 
     // --- Lesson Slots Dialog ---
 
-    // Opens a dialog to manage lesson slots for a trainer
-    // Only allows slots on days marked as working days in the working days dialog
-    // Slots are added to a table and saved all at once via PTService
-    private void showLessonSlotsDialog(JDialog parent, int trainerId, String trainerName,
-                                       PTService ptService,
-                                       String[] days, JCheckBox[] checks,
-                                       JTextField[] starts, JTextField[] ends) {
-
-        // Build list of active days and their working hours from the working days dialog
-        List<String> activeDaysList = new ArrayList<>();
-        Map<String, String[]> workingHours = new HashMap<>();
-        for (int i = 0; i < days.length; i++) {
-            if (checks[i].isSelected()) {
-                activeDaysList.add(days[i]);
-                workingHours.put(days[i], new String[]{
-                        starts[i].getText().trim(),
-                        ends[i].getText().trim()
-                });
-            }
-        }
-
-        // Cannot add slots if no working days are selected
-        if (activeDaysList.isEmpty()) {
-            JOptionPane.showMessageDialog(parent,
-                    "Please select at least one working day first.",
-                    "No Working Days", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
+    private void showLessonSlotsDialog(JDialog parent, int trainerId,
+                                       String trainerName, PTService ptService) {
         JDialog dialog = new JDialog(parent, "Lesson Slots — " + trainerName, true);
-        dialog.setSize(560, 500);
+        dialog.setSize(560, 480);
         dialog.setLocationRelativeTo(parent);
-        dialog.setLayout(new BorderLayout(5, 5));
 
-        // Table showing all current lesson slots
-        String[] cols = {"ID", "Day", "Start", "End"};
-        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+        DefaultTableModel slotModel = new DefaultTableModel(
+                new String[]{"ID", "Day", "Start", "End"}, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
+        JTable slotTable = new JTable(slotModel);
+        slotTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        slotTable.removeColumn(slotTable.getColumnModel().getColumn(0));
 
-        // Load existing slots from DB into table
-        List<TrainerLessonSlot> existingSlots = ptService.getLessonSlots(trainerId);
-        for (TrainerLessonSlot slot : existingSlots) {
-            model.addRow(new Object[]{
-                    slot.getSlotId(),
-                    slot.getDayOfWeek(),
-                    slot.getStartTime().toString(),
-                    slot.getEndTime().toString()
-            });
-        }
+        Runnable loadSlots = () -> {
+            slotModel.setRowCount(0);
+            for (TrainerLessonSlot s : ptService.getLessonSlots(trainerId)) {
+                slotModel.addRow(new Object[]{
+                        s.getSlotId(), s.getDayOfWeek(), s.getStartTime(), s.getEndTime()
+                });
+            }
+        };
+        loadSlots.run();
 
-        JTable table = new JTable(model);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints c = new GridBagConstraints();
+        c.insets = new Insets(4, 6, 4, 6);
+        c.fill = GridBagConstraints.HORIZONTAL;
 
-        JPanel tablePanel = new JPanel(new BorderLayout());
-        tablePanel.setBorder(BorderFactory.createTitledBorder("Current Lesson Slots"));
-        tablePanel.add(new JScrollPane(table), BorderLayout.CENTER);
-        dialog.add(tablePanel, BorderLayout.CENTER);
+        JComboBox<String> cbDay = new JComboBox<>(new String[]{
+                "MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY","SUNDAY"});
+        JTextField txtStart = new JTextField("09:00", 6);
+        JTextField txtEnd   = new JTextField("10:00", 6);
+        JButton btnAdd      = new JButton("Add Slot");
+        JButton btnRemove   = new JButton("Remove Selected");
+        JButton btnSaveAll  = new JButton("Save All");
 
-        // Dropdown shows active days with their working hour ranges
-        String[] dayLabels = activeDaysList.stream().map(d -> {
-            String[] h = workingHours.get(d);
-            return d + "  (" + h[0] + " – " + h[1] + ")";
-        }).toArray(String[]::new);
+        btnSaveAll.setBackground(new Color(33, 87, 141));
+        btnSaveAll.setForeground(Color.WHITE); btnSaveAll.setOpaque(true); btnSaveAll.setBorderPainted(false);
 
-        JComboBox<String> cbDay = new JComboBox<>(dayLabels);
-        JTextField txtStart     = new JTextField("09:00", 7);
-        JTextField txtEnd       = new JTextField("10:00", 7);
-        JButton btnAdd          = new JButton("Add Slot");
-        JButton btnDelete       = new JButton("Delete Selected");
+        c.gridy = 0;
+        c.gridx = 0; formPanel.add(new JLabel("Day:"), c);
+        c.gridx = 1; formPanel.add(cbDay, c);
+        c.gridx = 2; formPanel.add(new JLabel("Start:"), c);
+        c.gridx = 3; formPanel.add(txtStart, c);
+        c.gridx = 4; formPanel.add(new JLabel("End:"), c);
+        c.gridx = 5; formPanel.add(txtEnd, c);
+        c.gridx = 6; formPanel.add(btnAdd, c);
 
-        btnAdd.setBackground(new Color(33, 120, 80));
-        btnAdd.setForeground(Color.WHITE); btnAdd.setOpaque(true); btnAdd.setBorderPainted(false);
-        btnDelete.setBackground(new Color(150, 50, 50));
-        btnDelete.setForeground(Color.WHITE); btnDelete.setOpaque(true); btnDelete.setBorderPainted(false);
-
-        JPanel addPanel = new JPanel(new GridBagLayout());
-        addPanel.setBorder(BorderFactory.createTitledBorder("Add New Slot"));
-        GridBagConstraints ac = new GridBagConstraints();
-        ac.insets = new Insets(6, 8, 6, 8);
-        ac.fill = GridBagConstraints.HORIZONTAL;
-
-        ac.gridx = 0; ac.gridy = 0; ac.weightx = 0.3; addPanel.add(new JLabel("Day:"), ac);
-        ac.gridx = 1; ac.weightx = 0.7; ac.gridwidth = 3; addPanel.add(cbDay, ac);
-        ac.gridwidth = 1;
-        ac.gridx = 0; ac.gridy = 1; ac.weightx = 0.3; addPanel.add(new JLabel("Start (HH:MM):"), ac);
-        ac.gridx = 1; ac.weightx = 0.7; addPanel.add(txtStart, ac);
-        ac.gridx = 0; ac.gridy = 2; ac.weightx = 0.3; addPanel.add(new JLabel("End (HH:MM):"), ac);
-        ac.gridx = 1; ac.weightx = 0.7; addPanel.add(txtEnd, ac);
-        ac.gridx = 0; ac.gridy = 3; ac.gridwidth = 1; addPanel.add(btnAdd, ac);
-        ac.gridx = 1; addPanel.add(btnDelete, ac);
-
-        dialog.add(addPanel, BorderLayout.SOUTH);
-
-        // Adds a new slot row to the table — format validation only, business logic on save
         btnAdd.addActionListener(e -> {
             try {
-                String selectedDay = activeDaysList.get(cbDay.getSelectedIndex());
-                // Parse for format validation — exceptions caught if invalid
-                LocalTime.parse(txtStart.getText().trim());
-                LocalTime.parse(txtEnd.getText().trim());
-                model.addRow(new Object[]{"-", selectedDay,
-                        txtStart.getText().trim(), txtEnd.getText().trim()});
+                LocalTime s = LocalTime.parse(txtStart.getText().trim());
+                LocalTime en = LocalTime.parse(txtEnd.getText().trim());
+                slotModel.addRow(new Object[]{0, cbDay.getSelectedItem(), s, en});
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(dialog, "Invalid time format. Use HH:MM.",
-                        "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(dialog,
+                        "Invalid time format. Use HH:MM.", "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
-
-        // Removes the selected row from the table
-        btnDelete.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row >= 0) model.removeRow(row);
-            else JOptionPane.showMessageDialog(dialog, "Please select a slot to delete.");
+        btnRemove.addActionListener(e -> {
+            int row = slotTable.getSelectedRow();
+            if (row >= 0) slotModel.removeRow(row);
         });
-
-        // Saves all slots in the table to the database via PTService (delete + insert)
-        JButton btnSave = new JButton("Save All Slots");
-        btnSave.setBackground(new Color(33, 87, 141));
-        btnSave.setForeground(Color.WHITE); btnSave.setOpaque(true); btnSave.setBorderPainted(false);
-
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        bottom.add(btnSave);
-        dialog.add(bottom, BorderLayout.NORTH);
-
-        btnSave.addActionListener(e -> {
+        btnSaveAll.addActionListener(e -> {
             try {
-                List<TrainerLessonSlot> list = new ArrayList<>();
-                for (int i = 0; i < model.getRowCount(); i++) {
-                    TrainerLessonSlot slot = new TrainerLessonSlot();
-                    slot.setTrainerId(trainerId);
-                    slot.setDayOfWeek((String) model.getValueAt(i, 1));
-                    slot.setStartTime(LocalTime.parse((String) model.getValueAt(i, 2)));
-                    slot.setEndTime(LocalTime.parse((String) model.getValueAt(i, 3)));
-                    list.add(slot);
+                List<TrainerLessonSlot> slots = new ArrayList<>();
+                for (int i = 0; i < slotModel.getRowCount(); i++) {
+                    TrainerLessonSlot s = new TrainerLessonSlot();
+                    s.setTrainerId(trainerId);
+                    s.setDayOfWeek((String) slotModel.getValueAt(i, 1));
+                    s.setStartTime((LocalTime) slotModel.getValueAt(i, 2));
+                    s.setEndTime((LocalTime) slotModel.getValueAt(i, 3));
+                    slots.add(s);
                 }
-                // PTService.saveLessonSlots() uses delete + insert pattern
-                ptService.saveLessonSlots(trainerId, list);
-                JOptionPane.showMessageDialog(dialog, "Lesson slots saved successfully.");
-                dialog.dispose();
+                ptService.saveLessonSlots(trainerId, slots);
+                JOptionPane.showMessageDialog(dialog, "Lesson slots saved.");
+                loadSlots.run();
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(dialog, "Error: " + ex.getMessage(),
                         "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
 
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        actions.add(btnRemove);
+        actions.add(btnSaveAll);
+
+        dialog.setLayout(new BorderLayout());
+        dialog.add(formPanel, BorderLayout.NORTH);
+        dialog.add(new JScrollPane(slotTable), BorderLayout.CENTER);
+        dialog.add(actions, BorderLayout.SOUTH);
         dialog.setVisible(true);
+    }
+
+    // --- My Profile Tab ---
+
+    private JPanel buildMyProfilePanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(30, 60, 30, 60));
+        GridBagConstraints c = new GridBagConstraints();
+        c.insets = new Insets(8, 8, 8, 8);
+        c.fill = GridBagConstraints.HORIZONTAL;
+
+        JTextField txtName  = readOnly(manager.getFullName());
+        JTextField txtUser  = readOnly(manager.getUsername() != null ? manager.getUsername() : "");
+        JTextField txtEmail = readOnly(manager.getEmail() != null ? manager.getEmail() : "");
+        JTextField txtRole  = readOnly(manager.getRole());
+
+        JPasswordField txtCurrent = new JPasswordField(20);
+        JPasswordField txtNew     = new JPasswordField(20);
+        JPasswordField txtConfirm = new JPasswordField(20);
+
+        String[] labels    = {"Full Name (read-only)", "Username (read-only)",
+                "Email (read-only)", "Role (read-only)",
+                "Current Password", "New Password", "Confirm New Password"};
+        Component[] inputs = {txtName, txtUser, txtEmail, txtRole,
+                txtCurrent, txtNew, txtConfirm};
+
+        for (int i = 0; i < inputs.length; i++) {
+            c.gridx = 0; c.gridy = i; c.weightx = 0.35;
+            panel.add(new JLabel(labels[i] + ":"), c);
+            c.gridx = 1; c.weightx = 0.65;
+            panel.add(inputs[i], c);
+        }
+
+        JButton btnSave = new JButton("Update Password");
+        btnSave.setBackground(new Color(33, 87, 141));
+        btnSave.setForeground(Color.WHITE);
+        btnSave.setOpaque(true);
+        btnSave.setBorderPainted(false);
+        c.gridx = 0; c.gridy = inputs.length; c.gridwidth = 2;
+        panel.add(btnSave, c);
+
+        btnSave.addActionListener(e -> {
+            String current = new String(txtCurrent.getPassword());
+            String pass    = new String(txtNew.getPassword());
+            String confirm = new String(txtConfirm.getPassword());
+
+            if (current.isEmpty() || pass.isEmpty() || confirm.isEmpty()) {
+                JOptionPane.showMessageDialog(panel, "Please fill in all password fields.");
+                return;
+            }
+            if (pass.length() < 8) {
+                JOptionPane.showMessageDialog(panel,
+                        "New password must be at least 8 characters.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            if (!pass.equals(confirm)) {
+                JOptionPane.showMessageDialog(panel, "New passwords do not match.");
+                return;
+            }
+            if (pass.equals(current)) {
+                JOptionPane.showMessageDialog(panel,
+                        "New password cannot be the same as your current password.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (!authService.verifyManagerPassword(manager.getManagerId(), current)) {
+                JOptionPane.showMessageDialog(panel,
+                        "Current password is incorrect.",
+                        "Authentication Failed", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            AuthService.ResetResult result =
+                    authService.resetManagerPasswordByEmail(manager.getEmail(), pass);
+            if (result == AuthService.ResetResult.SUCCESS) {
+                JOptionPane.showMessageDialog(panel, "Password updated successfully.");
+                txtCurrent.setText("");
+                txtNew.setText("");
+                txtConfirm.setText("");
+            } else {
+                JOptionPane.showMessageDialog(panel,
+                        "Could not update password. Please try again.",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        return panel;
+    }
+
+    private JTextField readOnly(String value) {
+        JTextField field = new JTextField(value);
+        field.setEditable(false);
+        field.setBackground(new Color(240, 240, 240));
+        return field;
     }
 }

@@ -3,125 +3,86 @@ package com.iscms.model;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-// Model class representing a sports club member
-// Maps to the member table in the database
+// Member entity. Statuses: ACTIVE, PASSIVE, FROZEN, SUSPENDED, PENDING, REGISTRATION_FAILED.
+// PASSIVE means the membership has expired (or was cancelled and the end date passed).
+// PASSIVE members can log in to renew within 1 year, after which the account is auto-deleted.
 public class Member {
 
-    // Unique identifier for the member (maps to member_id in DB)
-    private int memberId;
-
-    // Full display name of the member
-    private String fullName;
-
-    // Date of birth — used for age validation (BR-01: must be 18+)
-    private LocalDate dateOfBirth;
-
-    // Gender of the member (e.g., MALE, FEMALE)
-    private String gender;
-
-    // Unique phone number (UNIQUE constraint in DB)
-    private String phone;
-
-    // Unique email address (UNIQUE constraint in DB)
-    private String email;
-
-    // BCrypt-hashed password (never stored as plain text)
-    private String password;
-
-    // Body weight in kg — nullable (Double, not double) because member may not have set it yet
-    private Double weight;
-
-    // Height in cm — nullable for the same reason as weight
-    private Double height;
-
-    // Calculated BMI value — nullable until member provides weight and height
-    private Double bmiValue;
-
-    // BMI category label (e.g., Underweight, Normal, Overweight, Obese)
-    private String bmiCategory;
-
-    // Timestamp of the last BMI calculation
+    private int           memberId;
+    private String        fullName;
+    private LocalDate     dateOfBirth;
+    private String        gender;
+    private String        phone;
+    private String        email;
+    private String        password;
+    private String        status;
+    private Double        weight;
+    private Double        height;
+    private Double        bmiValue;
+    private String        bmiCategory;
     private LocalDateTime bmiUpdatedAt;
-
-    // Name of the member's emergency contact person
-    private String emergencyContactName;
-
-    // Phone number of the member's emergency contact
-    private String emergencyContactPhone;
-
-    // Current account status:
-    // ACTIVE, PASSIVE, SUSPENDED, PENDING, REGISTRATION_FAILED, FROZEN
-    private String status;
-
-    // Number of consecutive failed login attempts (used for lockout logic)
-    private int failedAttempts;
-
-    // Whether this account is locked (true = cannot log in)
-    private boolean isLocked;
-
-    // Timestamp of when this member account was created
+    private String        emergencyContactName;
+    private String        emergencyContactPhone;
     private LocalDateTime createdAt;
+    private int           failedAttempts;
+    private boolean       locked;
 
-    // No-arg constructor required for JDBC result mapping
-    public Member() {}
+    // Batch 4 — cancellation lifecycle tracking
+    // cancellationRequestedAt: timestamp when member clicked "Cancel Membership".
+    //   Membership stays ACTIVE until end_date, then transitions to PASSIVE on next login.
+    // passiveSince: timestamp of when this member entered PASSIVE state.
+    //   Used to compute the 1-year window before auto-deletion.
+    private LocalDateTime cancellationRequestedAt;
+    private LocalDateTime passiveSince;
 
-    // --- Getters and Setters ---
+    // === Getters ===
 
-    public int getMemberId() { return memberId; }
-    public void setMemberId(int memberId) { this.memberId = memberId; }
+    public int           getMemberId()              { return memberId; }
+    public String        getFullName()              { return fullName; }
+    public LocalDate     getDateOfBirth()           { return dateOfBirth; }
+    public String        getGender()                { return gender; }
+    public String        getPhone()                 { return phone; }
+    public String        getEmail()                 { return email; }
+    public String        getPassword()              { return password; }
+    public String        getStatus()                { return status; }
+    public Double        getWeight()                { return weight; }
+    public Double        getHeight()                { return height; }
+    public Double        getBmiValue()              { return bmiValue; }
+    public String        getBmiCategory()           { return bmiCategory; }
+    public LocalDateTime getBmiUpdatedAt()          { return bmiUpdatedAt; }
+    public String        getEmergencyContactName()  { return emergencyContactName; }
+    public String        getEmergencyContactPhone() { return emergencyContactPhone; }
+    public LocalDateTime getCreatedAt()             { return createdAt; }
+    public int           getFailedAttempts()        { return failedAttempts; }
+    public boolean       isLocked()                 { return locked; }
+    public LocalDateTime getCancellationRequestedAt() { return cancellationRequestedAt; }
+    public LocalDateTime getPassiveSince()            { return passiveSince; }
 
-    public String getFullName() { return fullName; }
-    public void setFullName(String fullName) { this.fullName = fullName; }
+    // === Setters ===
 
-    public LocalDate getDateOfBirth() { return dateOfBirth; }
-    public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
+    public void setMemberId(int memberId)                       { this.memberId = memberId; }
+    public void setFullName(String fullName)                    { this.fullName = fullName; }
+    public void setDateOfBirth(LocalDate dateOfBirth)           { this.dateOfBirth = dateOfBirth; }
+    public void setGender(String gender)                        { this.gender = gender; }
+    public void setPhone(String phone)                          { this.phone = phone; }
+    public void setEmail(String email)                          { this.email = email; }
+    public void setPassword(String password)                    { this.password = password; }
+    public void setStatus(String status)                        { this.status = status; }
+    public void setWeight(Double weight)                        { this.weight = weight; }
+    public void setHeight(Double height)                        { this.height = height; }
+    public void setBmiValue(Double bmiValue)                    { this.bmiValue = bmiValue; }
+    public void setBmiCategory(String bmiCategory)              { this.bmiCategory = bmiCategory; }
+    public void setBmiUpdatedAt(LocalDateTime t)                { this.bmiUpdatedAt = t; }
+    public void setEmergencyContactName(String name)            { this.emergencyContactName = name; }
+    public void setEmergencyContactPhone(String phone)          { this.emergencyContactPhone = phone; }
+    public void setCreatedAt(LocalDateTime createdAt)           { this.createdAt = createdAt; }
+    public void setFailedAttempts(int failedAttempts)           { this.failedAttempts = failedAttempts; }
+    public void setLocked(boolean locked)                       { this.locked = locked; }
+    public void setCancellationRequestedAt(LocalDateTime t)     { this.cancellationRequestedAt = t; }
+    public void setPassiveSince(LocalDateTime t)                { this.passiveSince = t; }
 
-    public String getGender() { return gender; }
-    public void setGender(String gender) { this.gender = gender; }
-
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
-
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-
-    // Nullable Double — member may not have entered weight yet
-    public Double getWeight() { return weight; }
-    public void setWeight(Double weight) { this.weight = weight; }
-
-    // Nullable Double — member may not have entered height yet
-    public Double getHeight() { return height; }
-    public void setHeight(Double height) { this.height = height; }
-
-    // Nullable Double — calculated only after weight and height are provided
-    public Double getBmiValue() { return bmiValue; }
-    public void setBmiValue(Double bmiValue) { this.bmiValue = bmiValue; }
-
-    public String getBmiCategory() { return bmiCategory; }
-    public void setBmiCategory(String bmiCategory) { this.bmiCategory = bmiCategory; }
-
-    public LocalDateTime getBmiUpdatedAt() { return bmiUpdatedAt; }
-    public void setBmiUpdatedAt(LocalDateTime bmiUpdatedAt) { this.bmiUpdatedAt = bmiUpdatedAt; }
-
-    public String getEmergencyContactName() { return emergencyContactName; }
-    public void setEmergencyContactName(String v) { this.emergencyContactName = v; }
-
-    public String getEmergencyContactPhone() { return emergencyContactPhone; }
-    public void setEmergencyContactPhone(String v) { this.emergencyContactPhone = v; }
-
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-
-    public int getFailedAttempts() { return failedAttempts; }
-    public void setFailedAttempts(int failedAttempts) { this.failedAttempts = failedAttempts; }
-
-    // Boolean getter uses 'is' prefix — standard Java naming convention
-    public boolean isLocked() { return isLocked; }
-    public void setLocked(boolean locked) { isLocked = locked; }
-
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    // Convenience: has the member requested cancellation?
+    public boolean isCancellationRequested() {
+        return cancellationRequestedAt != null;
+    }
 }
