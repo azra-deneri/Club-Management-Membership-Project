@@ -43,3 +43,5 @@ src/main/resources/db.properties
 ### Application logs ###
 *.log
 app.log
+
+.idea/workspace.xml
