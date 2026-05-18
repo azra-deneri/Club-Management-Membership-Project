@@ -79,12 +79,48 @@ public class MemberDashboard extends JFrame {
         // shows accurate badges without waiting for a manager-side sweep.
         memberService.markOverdueInstallments();
 
+        // PAYMENT_HOLD members get a stripped-down dashboard. We only expose the tabs
+// they need to clear the hold (Installments + Payments) plus read-only context
+// (Profile + Membership). Events / PT Sessions / BMI are hidden — using those
+// while you owe money would feel wrong, and it nudges the user toward paying.
+        boolean onPaymentHold = "PAYMENT_HOLD".equals(member.getStatus());
+
+        if (onPaymentHold) {
+            // Banner directly above the tabs — bright enough to be unmissable
+            JPanel banner = new JPanel(new BorderLayout());
+            banner.setBackground(new Color(180, 50, 50));
+            banner.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
+            JLabel lblBanner = new JLabel(
+                    "⚠  Account on Payment Hold  —  "
+                            + "Pay your overdue installments below to restore full access.");
+            lblBanner.setForeground(Color.WHITE);
+            lblBanner.setFont(new Font("Arial", Font.BOLD, 12));
+            banner.add(lblBanner, BorderLayout.WEST);
+
+            // Stack: top bar + banner. We wrap them in a vertical panel so both
+            // sit at NORTH of the frame.
+            JPanel northStack = new JPanel(new BorderLayout());
+            // Re-host the existing topBar (already added). Pull it out and re-add:
+            Component existingNorth = ((BorderLayout) getContentPane().getLayout())
+                    .getLayoutComponent(BorderLayout.NORTH);
+            if (existingNorth != null) {
+                getContentPane().remove(existingNorth);
+                northStack.add(existingNorth, BorderLayout.NORTH);
+            }
+            northStack.add(banner, BorderLayout.SOUTH);
+            add(northStack, BorderLayout.NORTH);
+        }
+
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Profile",     buildProfilePanel());
         tabs.addTab("Membership",  buildMembershipPanel());
-        tabs.addTab("Events",      new MemberEventPanel(member));
-        tabs.addTab("PT Sessions", new PTPanel(member));
-        tabs.addTab("BMI",         new BmiPanel(member));
+
+        if (!onPaymentHold) {
+            tabs.addTab("Events",      new MemberEventPanel(member));
+            tabs.addTab("PT Sessions", new PTPanel(member));
+            tabs.addTab("BMI",         new BmiPanel(member));
+        }
+
         tabs.addTab("Payments",    buildPaymentsPanel());
         if (showInstallmentsTab) {
             tabs.addTab("Installments", buildInstallmentsPanel());
@@ -102,12 +138,12 @@ public class MemberDashboard extends JFrame {
         c.insets = new Insets(6, 6, 6, 6);
         c.fill = GridBagConstraints.HORIZONTAL;
 
-        JTextField txtName   = readOnly(member.getFullName());
-        JTextField txtPhone  = new JTextField(member.getPhone() != null ? member.getPhone() : "");
-        JTextField txtEmail  = new JTextField(member.getEmail() != null ? member.getEmail() : "");
-        JTextField txtDob    = readOnly(member.getDateOfBirth().toString());
-        JTextField txtWeight = new JTextField(member.getWeight() != null ? String.valueOf(member.getWeight()) : "");
-        JTextField txtHeight = new JTextField(member.getHeight() != null ? String.valueOf(member.getHeight()) : "");
+        JTextField txtName    = readOnly(member.getFullName());
+        JTextField txtPhone   = new JTextField(member.getPhone() != null ? member.getPhone() : "");
+        JTextField txtEmail   = new JTextField(member.getEmail() != null ? member.getEmail() : "");
+        JTextField txtDob     = readOnly(member.getDateOfBirth().toString());
+        JTextField txtWeight  = new JTextField(member.getWeight() != null ? String.valueOf(member.getWeight()) : "");
+        JTextField txtHeight  = new JTextField(member.getHeight() != null ? String.valueOf(member.getHeight()) : "");
         JTextField txtEcName  = new JTextField(member.getEmergencyContactName() != null ? member.getEmergencyContactName() : "");
         JTextField txtEcPhone = new JTextField(member.getEmergencyContactPhone() != null ? member.getEmergencyContactPhone() : "");
 
@@ -128,6 +164,22 @@ public class MemberDashboard extends JFrame {
         btnSave.setForeground(Color.WHITE);
         btnSave.setOpaque(true);
         btnSave.setBorderPainted(false);
+
+        // PAYMENT_HOLD: form is read-only. The user's only path forward is paying
+        // installments — we don't want them tweaking weight/contact info while
+        // the account is in a degraded state.
+        boolean onPaymentHold = "PAYMENT_HOLD".equals(member.getStatus());
+        if (onPaymentHold) {
+            txtPhone.setEditable(false);
+            txtEmail.setEditable(false);
+            txtWeight.setEditable(false);
+            txtHeight.setEditable(false);
+            txtEcName.setEditable(false);
+            txtEcPhone.setEditable(false);
+            btnSave.setEnabled(false);
+            btnSave.setText("Profile editing disabled while on Payment Hold");
+        }
+
         c.gridx = 0; c.gridy = fields.length; c.gridwidth = 2;
         panel.add(btnSave, c);
 
@@ -185,54 +237,59 @@ public class MemberDashboard extends JFrame {
         });
 
         // === Account lifecycle buttons (Batch 4) ===
-        // Visual separator before the danger-zone buttons
-        JSeparator sep = new JSeparator();
-        c.gridx = 0; c.gridy = fields.length + 1; c.gridwidth = 2;
-        c.insets = new Insets(20, 6, 6, 6);
-        panel.add(sep, c);
+        // Hide the Account section entirely when on PAYMENT_HOLD — the user's only
+        // task right now is paying their dues; cancellation / deletion is a confusing
+        // side door we shouldn't offer until the account is back to ACTIVE.
+        if (!onPaymentHold) {
+            JSeparator sep = new JSeparator();
+            c.gridx = 0; c.gridy = fields.length + 1; c.gridwidth = 2;
+            c.insets = new Insets(20, 6, 6, 6);
+            panel.add(sep, c);
 
-        JLabel lblSection = new JLabel("Account");
-        lblSection.setFont(new Font("Arial", Font.BOLD, 13));
-        c.gridy = fields.length + 2;
-        c.insets = new Insets(0, 6, 6, 6);
-        panel.add(lblSection, c);
+            JLabel lblSection = new JLabel("Account");
+            lblSection.setFont(new Font("Arial", Font.BOLD, 13));
+            c.gridy = fields.length + 2;
+            c.insets = new Insets(0, 6, 6, 6);
+            panel.add(lblSection, c);
 
-        // --- Cancel Membership button ---
-        // Active member with no pending cancellation: button enabled
-        // Active member who already requested cancellation: shows confirmation label
-        // PASSIVE/FROZEN/SUSPENDED member: cancel button hidden (already non-active)
-        c.gridy = fields.length + 3;
-        if ("ACTIVE".equals(member.getStatus())) {
-            if (member.isCancellationRequested()) {
-                // Already cancelled — show informational label, no button
-                JLabel lblCancelled = new JLabel(
-                        "✓ Cancellation requested on "
-                                + member.getCancellationRequestedAt()
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-                                + ". Membership remains active until its end date.");
-                lblCancelled.setForeground(new Color(180, 130, 0));
-                panel.add(lblCancelled, c);
-            } else {
-                JButton btnCancel = new JButton("Cancel Membership");
-                btnCancel.setBackground(new Color(180, 130, 0));
-                btnCancel.setForeground(Color.WHITE);
-                btnCancel.setOpaque(true);
-                btnCancel.setBorderPainted(false);
-                btnCancel.addActionListener(e -> handleCancelMembership());
-                panel.add(btnCancel, c);
+            // --- Cancel Membership button ---
+            // Active member with no pending cancellation: button enabled
+            // Active member who already requested cancellation: shows confirmation label
+            // PASSIVE/FROZEN/SUSPENDED member: cancel button hidden (already non-active)
+            c.gridy = fields.length + 3;
+            if ("ACTIVE".equals(member.getStatus())) {
+                if (member.isCancellationRequested()) {
+                    // Already cancelled — show informational label, no button
+                    JLabel lblCancelled = new JLabel(
+                            "✓ Cancellation requested on "
+                                    + member.getCancellationRequestedAt()
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                                    + ". Membership remains active until its end date.");
+                    lblCancelled.setForeground(new Color(180, 130, 0));
+                    panel.add(lblCancelled, c);
+                } else {
+                    JButton btnCancel = new JButton("Cancel Membership");
+                    btnCancel.setBackground(new Color(180, 130, 0));
+                    btnCancel.setForeground(Color.WHITE);
+                    btnCancel.setOpaque(true);
+                    btnCancel.setBorderPainted(false);
+                    btnCancel.addActionListener(e -> handleCancelMembership());
+                    panel.add(btnCancel, c);
+                }
             }
-        }
 
-        // --- Delete Account button ---
-        // Always visible — gives every member the option to leave the system entirely.
-        c.gridy = fields.length + 4;
-        JButton btnDelete = new JButton("Delete Account");
-        btnDelete.setBackground(new Color(150, 50, 50));
-        btnDelete.setForeground(Color.WHITE);
-        btnDelete.setOpaque(true);
-        btnDelete.setBorderPainted(false);
-        btnDelete.addActionListener(e -> handleDeleteAccount());
-        panel.add(btnDelete, c);
+            // --- Delete Account button ---
+            // Always visible (within Account section) — gives every member the option
+            // to leave the system entirely.
+            c.gridy = fields.length + 4;
+            JButton btnDelete = new JButton("Delete Account");
+            btnDelete.setBackground(new Color(150, 50, 50));
+            btnDelete.setForeground(Color.WHITE);
+            btnDelete.setOpaque(true);
+            btnDelete.setBorderPainted(false);
+            btnDelete.addActionListener(e -> handleDeleteAccount());
+            panel.add(btnDelete, c);
+        }
 
         return panel;
     }
@@ -417,6 +474,11 @@ public class MemberDashboard extends JFrame {
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
 
+        // PAYMENT_HOLD members can't upgrade or freeze. Both actions either cost
+// extra money (upgrade fee) or extend the contract (freeze) — neither makes
+// sense while the member owes installments. Restrict here, not just in service.
+        boolean onPaymentHold = "PAYMENT_HOLD".equals(member.getStatus());
+
         JButton btnUpgrade = new JButton("Request Tier Upgrade");
         btnUpgrade.setBackground(new Color(180, 130, 0));
         btnUpgrade.setForeground(Color.WHITE);
@@ -425,13 +487,21 @@ public class MemberDashboard extends JFrame {
         if ("VIP".equals(ms.getTier())) {
             btnUpgrade.setEnabled(false);
             btnUpgrade.setToolTipText("You are already on the highest tier.");
+        } else if (onPaymentHold) {
+            btnUpgrade.setEnabled(false);
+            btnUpgrade.setToolTipText("Tier upgrades are unavailable while on Payment Hold.");
         } else {
             btnUpgrade.addActionListener(e -> showUpgradeDialog(ms, daysLeft));
         }
         btnPanel.add(btnUpgrade);
 
         JButton btnFreeze = new JButton("Freeze Membership");
-        btnFreeze.addActionListener(e -> showFreezeDialog(ms));
+        if (onPaymentHold) {
+            btnFreeze.setEnabled(false);
+            btnFreeze.setToolTipText("Freeze is unavailable while on Payment Hold.");
+        } else {
+            btnFreeze.addActionListener(e -> showFreezeDialog(ms));
+        }
         btnPanel.add(btnFreeze);
 
         if ("PASSIVE".equals(member.getStatus())) {

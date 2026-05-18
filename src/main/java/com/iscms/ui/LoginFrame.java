@@ -13,6 +13,11 @@ import java.awt.*;
 public class LoginFrame extends JFrame {
 
     private final AuthService authService = new AuthService();
+    // Used only for hint-rendering on the login screen (overdue count for the
+// PAYMENT_HOLD notice). Keeping it as a field avoids re-instantiating on every
+// login click. AuthService is the source of truth for actual auth decisions.
+    private final com.iscms.service.MemberService memberServiceForUiHints =
+            new com.iscms.service.MemberService();
 
     private JTextField txtIdentifier;
     private JPasswordField txtPassword;
@@ -118,12 +123,35 @@ public class LoginFrame extends JFrame {
         switch (result.getStatus()) {
 
             case SUCCESS -> {
-                dispose();
                 if (rbMember.isSelected()) {
-                    new MemberDashboard((Member) result.getUser()).setVisible(true);
+                    Member loggedInMember = (Member) result.getUser();
+
+                    // Payment hold notice — member crossed the overdue threshold and was
+                    // auto-suspended pending payment. We let them in (they need to be able
+                    // to pay) but the dashboard will render in restricted mode.
+                    if ("PAYMENT_HOLD".equals(loggedInMember.getStatus())) {
+                        long overdue = memberServiceForUiHints
+                                .getInstallmentsForMember(loggedInMember.getMemberId())
+                                .stream()
+                                .filter(i -> "OVERDUE".equals(i.getStatus()))
+                                .count();
+                        JOptionPane.showMessageDialog(this,
+                                "Account on Payment Hold\n\n"
+                                        + "You have " + overdue + " overdue installment payments.\n"
+                                        + "Your account access is limited until the overdue\n"
+                                        + "balance is cleared.\n\n"
+                                        + "Please go to the Installments tab and pay your\n"
+                                        + "outstanding installments to restore full access.",
+                                "Payment Hold", JOptionPane.WARNING_MESSAGE);
+                    }
+
+                    dispose();
+                    new MemberDashboard(loggedInMember).setVisible(true);
                 } else if (rbTrainer.isSelected()) {
+                    dispose();
                     new TrainerDashboard((Trainer) result.getUser()).setVisible(true);
                 } else {
+                    dispose();
                     Manager mgr = (Manager) result.getUser();
                     if ("ADMIN".equals(mgr.getRole()))
                         new AdminDashboard(mgr).setVisible(true);

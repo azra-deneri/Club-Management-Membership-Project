@@ -22,20 +22,30 @@ public class AuthService {
     private final ManagerDAO managerDAO;
     private final TrainerDAO trainerDAO;
     private final MembershipDAO membershipDAO;
+    private final MemberService memberService;
 
     public AuthService() {
         this.memberDAO     = new MemberDAOImpl();
         this.managerDAO    = new ManagerDAOImpl();
         this.trainerDAO    = new TrainerDAOImpl();
         this.membershipDAO = new MembershipDAOImpl();
+        this.memberService = new MemberService();
     }
 
     public AuthService(MemberDAO memberDAO, ManagerDAO managerDAO,
                        TrainerDAO trainerDAO, MembershipDAO membershipDAO) {
+        this(memberDAO, managerDAO, trainerDAO, membershipDAO, new MemberService());
+    }
+
+    // New constructor for tests that need to mock MemberService too
+    public AuthService(MemberDAO memberDAO, ManagerDAO managerDAO,
+                       TrainerDAO trainerDAO, MembershipDAO membershipDAO,
+                       MemberService memberService) {
         this.memberDAO     = memberDAO;
         this.managerDAO    = managerDAO;
         this.trainerDAO    = trainerDAO;
         this.membershipDAO = membershipDAO;
+        this.memberService = memberService;
     }
 
     private static final int SUGGEST_RESET_AT    = 3;
@@ -116,7 +126,25 @@ public class AuthService {
             }
         });
 
+// Re-fetch after the potential PASSIVE transition above. If they just went
+// PASSIVE, skip the payment-hold check entirely — PASSIVE/expired members
+// don't get burdened with installment-overdue restrictions on top.
         Member refreshed = memberDAO.findByPhone(phone).orElse(member);
+        if (!"ACTIVE".equals(refreshed.getStatus())) {
+            return LoginResult.success(refreshed);
+        }
+
+// === Payment-hold auto-check (Tur 4a) ===
+// Refresh OVERDUE flags on the installment table, then test the threshold.
+// If the member crosses 3+ overdue installments, we transition them to
+// PAYMENT_HOLD here. The dashboard will render in restricted mode based on
+// the returned status — they can still pay installments, but other tabs
+// are locked until they catch up.
+        memberService.markOverdueInstallments();
+        memberService.checkAndApplyPaymentHold(refreshed.getMemberId());
+
+// Re-fetch one more time in case checkAndApplyPaymentHold flipped the status
+        refreshed = memberDAO.findByPhone(phone).orElse(refreshed);
         return LoginResult.success(refreshed);
     }
 

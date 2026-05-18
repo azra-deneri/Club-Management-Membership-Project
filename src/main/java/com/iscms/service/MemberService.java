@@ -328,12 +328,80 @@ public class MemberService {
         paymentDAO.insert(payment);                // sets payment.paymentId via generated keys
 
         installmentDAO.markPaid(installmentId, payment.getPaymentId());
+
+        // Auto-reactivate if this payment cleared all overdue debt.
+        // Member doesn't need to do anything else — the next page they see
+        // will be the unrestricted dashboard.
+        reactivateIfPaidUp(inst.getMemberId() != null ? inst.getMemberId() : 0);
     }
 
     // Bulk transition: PENDING installments past their due_date become OVERDUE.
     // Called from manager dashboard load (sweep) and member dashboard load (cosmetic).
     public int markOverdueInstallments() {
         return installmentDAO.markOverdueGlobal();
+    }
+
+    // Threshold: how many overdue installments trigger an automatic PAYMENT_HOLD.
+// 3 strikes is a common industry default — gives enough warning without dragging on.
+    private static final int OVERDUE_THRESHOLD_FOR_HOLD = 3;
+
+    // Called at login (after markOverdueInstallments) to enforce the auto-hold rule.
+// If the member has accumulated OVERDUE_THRESHOLD_FOR_HOLD or more overdue
+// installments AND is currently ACTIVE, transition them to PAYMENT_HOLD.
+//
+// Manager-applied SUSPENDED is left untouched — that's a different concept
+// (disciplinary) and shouldn't be auto-reversed by this method.
+//
+// Returns true if the member was placed on hold, false otherwise.
+    public boolean checkAndApplyPaymentHold(int memberId) {
+        Optional<Member> opt = memberDAO.findById(memberId);
+        if (opt.isEmpty()) return false;
+        Member m = opt.get();
+
+        // Only apply auto-hold to ACTIVE members. Don't touch PASSIVE, SUSPENDED, etc.
+        if (!"ACTIVE".equals(m.getStatus())) return false;
+
+        long overdueCount = installmentDAO.findByMemberId(memberId).stream()
+                .filter(i -> "OVERDUE".equals(i.getStatus()))
+                .count();
+
+        if (overdueCount >= OVERDUE_THRESHOLD_FOR_HOLD) {
+            memberDAO.updateStatus(memberId, "PAYMENT_HOLD");
+            m.setStatus("PAYMENT_HOLD");
+            return true;
+        }
+        return false;
+    }
+
+    // Called after a successful installment payment. If the member is currently
+// on PAYMENT_HOLD AND has zero remaining OVERDUE installments, lift the hold
+// and put them back to ACTIVE automatically.
+//
+// This is the "self-service recovery" path — member pays their dues, account
+// reopens. No manager intervention required.
+//
+// Returns true if the member was reactivated, false otherwise.
+    public boolean reactivateIfPaidUp(int memberId) {
+        Optional<Member> opt = memberDAO.findById(memberId);
+        if (opt.isEmpty()) return false;
+        Member m = opt.get();
+
+        if (!"PAYMENT_HOLD".equals(m.getStatus())) return false;
+
+        // Refresh OVERDUE flags before counting — a freshly-paid installment
+        // should already be PAID, but sweeping is cheap insurance.
+        markOverdueInstallments();
+
+        long stillOverdue = installmentDAO.findByMemberId(memberId).stream()
+                .filter(i -> "OVERDUE".equals(i.getStatus()))
+                .count();
+
+        if (stillOverdue == 0) {
+            memberDAO.updateStatus(memberId, "ACTIVE");
+            m.setStatus("ACTIVE");
+            return true;
+        }
+        return false;
     }
 
     // Returns all installments for a member (for the Installments tab UI)
