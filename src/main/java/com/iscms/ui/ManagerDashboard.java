@@ -257,8 +257,8 @@ public class ManagerDashboard extends JFrame {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         JTable table = new JTable(model);
+        table.getTableHeader().setReorderingAllowed(false);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        table.removeColumn(table.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
         Runnable load = () -> {
@@ -408,8 +408,9 @@ public class ManagerDashboard extends JFrame {
         };
 
         JTable table = new JTable(model);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.getTableHeader().setReorderingAllowed(false);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+// Hide ReqID column — kept in model for Approve/Reject actions to read.
         table.removeColumn(table.getColumnModel().getColumn(0));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
 

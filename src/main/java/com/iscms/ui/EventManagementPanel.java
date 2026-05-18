@@ -86,6 +86,10 @@ public class EventManagementPanel extends JPanel {
         eventTable = new JTable(tableModel);
         eventTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         eventTable.getTableHeader().setReorderingAllowed(false);
+// Hide ID column from view — kept in model so action buttons
+// (Edit Event, Cancel Event, Edit Capacity, View Registrations) can still
+// read the selected event's ID via tableModel.getValueAt(row, 0).
+        eventTable.removeColumn(eventTable.getColumnModel().getColumn(0));
         add(new JScrollPane(eventTable), BorderLayout.CENTER);
 
         btnRefresh.addActionListener(e  -> loadEvents());
