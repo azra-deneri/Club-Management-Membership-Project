@@ -2,6 +2,7 @@ package com.iscms.service;
 
 import com.iscms.dao.*;
 import com.iscms.model.*;
+import com.iscms.service.policy.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -62,12 +63,12 @@ public class PTService {
         Membership ms = membershipDAO.findActiveByMemberId(memberId)
                 .orElseThrow(() -> new IllegalStateException("No active membership."));
 
-        // Check 2: CLASSIC members cannot book PT sessions
-        if ("CLASSIC".equals(ms.getTier()))
-            throw new IllegalStateException("Classic members cannot book PT sessions.");
+        // Check 2 + 3: tier policy enforces both PT eligibility and monthly limit
+        TierPolicy policy = TierPolicyRegistry.forTier(ms.getTier());
+        if (!policy.allowsPtSessions())
+            throw new IllegalStateException(ms.getTier() + " members cannot book PT sessions.");
 
-        // Check 3: monthly session limit based on tier
-        int monthLimit = "GOLD".equals(ms.getTier()) ? 2 : 4;
+        int monthLimit = policy.maxPtSessionsPerMonth();
         int used = appointmentDAO.countMonthlyAppointments(
                 memberId, date.getYear(), date.getMonthValue());
         if (used >= monthLimit)

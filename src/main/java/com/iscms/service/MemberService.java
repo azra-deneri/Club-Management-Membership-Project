@@ -2,6 +2,7 @@ package com.iscms.service;
 
 import com.iscms.dao.*;
 import com.iscms.model.*;
+import com.iscms.service.policy.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -221,8 +222,7 @@ public class MemberService {
         Payment firstPayment = recordMembershipPayment(saved.getMemberId(), tier, packageType,
                 calculateAmount(tier, packageType), 0, "ONLINE", null);
 
-        // ANNUAL_INSTALLMENT — create the 12-month schedule, with month 1 already paid
-        if ("ANNUAL_INSTALLMENT".equals(packageType)) {
+        if (PackageStrategyRegistry.forPackage(packageType).requiresInstallmentSchedule()) {
             createInstallmentSchedule(ms.getMembershipId(), saved.getMemberId(),
                     calculateAmount(tier, packageType), firstPayment.getPaymentId());
         }
@@ -248,7 +248,7 @@ public class MemberService {
         Payment firstPayment = recordMembershipPayment(memberId, tier, packageType,
                 calculateAmount(tier, packageType), 0, "ONLINE", null);
 
-        if ("ANNUAL_INSTALLMENT".equals(packageType)) {
+        if (PackageStrategyRegistry.forPackage(packageType).requiresInstallmentSchedule()) {
             createInstallmentSchedule(ms.getMembershipId(), memberId,
                     calculateAmount(tier, packageType), firstPayment.getPaymentId());
         }
@@ -470,13 +470,8 @@ public class MemberService {
         Membership ms = membershipDAO.findById(membershipId)
                 .orElseThrow(() -> new IllegalStateException("Membership not found."));
 
-        int maxFreeze = switch (ms.getTier()) {
-            case "GOLD" -> 2;
-            case "VIP"  -> 3;
-            default     -> 1;
-        };
-
-        if (ms.getFreezeCount() >= maxFreeze)
+        TierPolicy policy = TierPolicyRegistry.forTier(ms.getTier());
+        if (ms.getFreezeCount() >= policy.maxFreezePerMonth())
             throw new IllegalStateException("Freeze limit reached for " + ms.getTier() + " tier.");
 
         if (ms.getEndDate().minusDays(3).isBefore(LocalDate.now()))
@@ -556,23 +551,13 @@ public class MemberService {
     // === Pricing & validation ===
 
     public double calculateAmount(String tier, String packageType) {
-        double monthly = switch (tier) {
-            case "GOLD" -> 1250.0;
-            case "VIP"  -> 2000.0;
-            default     -> 750.0;
-        };
-        return switch (packageType) {
-            case "ANNUAL_PREPAID"     -> monthly * 12 * 0.85;
-            case "ANNUAL_INSTALLMENT" -> monthly * 1.07;
-            default                   -> monthly;
-        };
+        double base = TierPolicyRegistry.forTier(tier).baseMonthlyPrice();
+        return PackageStrategyRegistry.forPackage(packageType).calculatePrice(base);
     }
 
     private LocalDate calcEndDate(String packageType) {
-        return switch (packageType) {
-            case "ANNUAL_PREPAID", "ANNUAL_INSTALLMENT" -> LocalDate.now().plusDays(365);
-            default -> LocalDate.now().plusDays(30);
-        };
+        return PackageStrategyRegistry.forPackage(packageType)
+                .calculateEndDate(LocalDate.now());
     }
 
     private String calcBmiCategory(double bmi) {
@@ -634,40 +619,15 @@ public class MemberService {
     }
 
     public String[] getBmiSuggestions(String category) {
-        return switch (category) {
-            case "UNDERWEIGHT" -> new String[]{
-                    "Increase caloric intake with nutrient-dense foods.",
-                    "Consider strength training to build muscle mass.",
-                    "Consult a nutritionist for a personalized meal plan."
-            };
-            case "NORMAL" -> new String[]{
-                    "Maintain your current healthy lifestyle.",
-                    "Regular exercise 3-5 times per week is recommended.",
-                    "Stay hydrated and keep a balanced diet."
-            };
-            case "OVERWEIGHT" -> new String[]{
-                    "Aim for 150-300 minutes of moderate exercise per week.",
-                    "Reduce processed foods and sugary drinks.",
-                    "Consider consulting a nutritionist."
-            };
-            case "OBESE" -> new String[]{
-                    "Consult a healthcare professional for a safe weight-loss plan.",
-                    "Start with low-impact exercises such as walking or swimming.",
-                    "Focus on gradual, sustainable lifestyle changes."
-            };
-            default -> new String[]{"No suggestions available."};
-        };
+        return BmiAdviceRegistry.forCategory(category).suggestions();
     }
 
     public double calculateDailyCalories(double weight, double height,
                                          String gender, LocalDate dob) {
         int age = Period.between(dob, LocalDate.now()).getYears();
-        double bmr;
-        if ("MALE".equals(gender))
-            bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
-        else
-            bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
-        return bmr * 1.55;
+        double bmr = BmrStrategyRegistry.forGender(gender)
+                .calculate(weight, height, age);
+        return bmr * 1.55;   // sedentary activity multiplier
     }
 
     // === Internal helpers ===

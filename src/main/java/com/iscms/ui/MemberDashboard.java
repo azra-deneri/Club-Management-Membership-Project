@@ -4,6 +4,7 @@ import com.iscms.model.*;
 import com.iscms.service.AuthService;
 import com.iscms.service.MemberService;
 import com.iscms.service.PaymentResult;
+import com.iscms.service.policy.*;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -636,11 +637,8 @@ public class MemberDashboard extends JFrame {
     }
 
     private double perDayRate(String tier, String packageType) {
-        return switch (packageType) {
-            case "ANNUAL_PREPAID"     -> (memberService.calculateAmount(tier, "MONTHLY") * 12 * 0.85) / 365;
-            case "ANNUAL_INSTALLMENT" -> (memberService.calculateAmount(tier, "MONTHLY") * 1.07) / 30;
-            default                   -> memberService.calculateAmount(tier, "MONTHLY") / 30;
-        };
+        double base = TierPolicyRegistry.forTier(tier).baseMonthlyPrice();
+        return PackageStrategyRegistry.forPackage(packageType).dailyRate(base);
     }
 
     // --- Freeze Dialog ---
@@ -686,11 +684,9 @@ public class MemberDashboard extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
 
-        String[] tiers = switch (currentTier) {
-            case "GOLD" -> new String[]{"GOLD", "VIP"};
-            case "VIP"  -> new String[]{"VIP"};
-            default     -> new String[]{"CLASSIC", "GOLD", "VIP"};
-        };
+        String[] tiers = TierPolicyRegistry.forTier(currentTier)
+                .availableRenewalTiers()
+                .toArray(new String[0]);
 
         JComboBox<String> cbTier    = new JComboBox<>(tiers);
         JComboBox<String> cbPackage = new JComboBox<>();
