@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile — ISC-MS</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 700px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 24px; flex-wrap: wrap; gap: 8px;
+        }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        h2 {
+            color: #1d1d1f; font-size: 16px; margin: 28px 0 12px;
+            padding-bottom: 6px; border-bottom: 2px solid #f0f0f0;
+        }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+
+        .alert {
+            padding: 12px 16px; border-radius: 8px; margin-bottom: 16px;
+            font-size: 13px;
+        }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #135200; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffa39e; color: #820014; }
+
+        .info-grid {
+            display: grid; grid-template-columns: 140px 1fr;
+            gap: 12px 20px; padding: 16px 20px;
+            background: #fafafa; border: 1px solid #ececec;
+            border-radius: 8px;
+        }
+        .info-grid .label { color: #6e6e73; font-size: 13px; }
+        .info-grid .value { color: #1d1d1f; font-size: 14px; font-weight: 500; }
+
+        form { display: flex; flex-direction: column; gap: 14px; }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label {
+            font-size: 12px; color: #6e6e73; text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .field input {
+            padding: 10px 12px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            font-family: inherit;
+        }
+        .field input:focus { outline: none; border-color: #0071e3; }
+        .btn-save {
+            padding: 10px 20px; background: #0071e3; color: white;
+            border: none; border-radius: 6px; font-size: 14px;
+            cursor: pointer; align-self: flex-start;
+        }
+        .btn-save:hover { background: #0077ed; }
+
+        .pill {
+            display: inline-block; padding: 2px 10px; border-radius: 12px;
+            font-size: 11px; font-weight: 600;
+        }
+        .pill-active   { background: #f6ffed; color: #135200; }
+        .pill-inactive { background: #f5f5f7; color: #8c8c8c; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>My Profile</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}"   class="alert alert-error"   th:text="${error}"></div>
+
+    <h2>Profile Information</h2>
+    <div class="info-grid">
+        <div class="label">Full Name</div>
+        <div class="value" th:text="${trainer.fullName}">Trainer Name</div>
+
+        <div class="label">Username</div>
+        <div class="value" th:text="${trainer.username}">username</div>
+
+        <div class="label">Email</div>
+        <div class="value" th:text="${trainer.email}">email@isc.com</div>
+
+        <div class="label">Specialty</div>
+        <div class="value" th:text="${trainer.specialty}">FITNESS</div>
+
+        <div class="label">Status</div>
+        <div class="value">
+            <span class="pill" th:classappend="${trainer.active} ? 'pill-active' : 'pill-inactive'"
+                  th:text="${trainer.active} ? 'ACTIVE' : 'INACTIVE'">ACTIVE</span>
+        </div>
+    </div>
+
+    <h2>Change Password</h2>
+    <form th:action="@{/trainer/profile/password}" method="post">
+        <div class="field">
+            <label for="currentPassword">Current Password</label>
+            <input type="password" id="currentPassword" name="currentPassword" required>
+        </div>
+        <div class="field">
+            <label for="newPassword">New Password (min 6 characters)</label>
+            <input type="password" id="newPassword" name="newPassword" required minlength="6">
+        </div>
+        <div class="field">
+            <label for="confirmPassword">Confirm New Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" required minlength="6">
+        </div>
+        <button type="submit" class="btn-save">Change Password</button>
+    </form>
+</div>
+</body>
+</html>

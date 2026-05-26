@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — Renew Membership</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 720px; margin: 40px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 24px; }
+        h1 { margin: 0; color: #1d1d1f; }
+        h2 { color: #1d1d1f; margin: 24px 0 12px; font-size: 16px;
+             text-transform: uppercase; letter-spacing: 0.5px; color: #6e6e73; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .info-banner {
+            background: #fff7e6; border: 1px solid #ffd591; color: #874d00;
+            padding: 14px 16px; border-radius: 8px; margin-bottom: 24px;
+            font-size: 13px; line-height: 1.5;
+        }
+        .alert-error {
+            background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322;
+            padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+        }
+
+        /* Tier + package picker */
+        .picker {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+            margin-bottom: 24px;
+        }
+        @media (max-width: 600px) { .picker { grid-template-columns: 1fr; } }
+
+        .option {
+            display: block; padding: 12px 14px;
+            border: 2px solid #e0e0e3; border-radius: 8px;
+            margin-bottom: 8px; cursor: pointer;
+            transition: all 0.15s;
+        }
+        .option:hover { border-color: #0071e3; background: #f0f7ff; }
+        .option input[type=radio] { margin-right: 10px; }
+        .option-title { font-weight: 600; color: #1d1d1f; font-size: 14px; }
+        .option-sub   { font-size: 12px; color: #6e6e73; margin-top: 2px; margin-left: 22px; }
+
+        /* Selected highlight via JS class */
+        .option.selected { border-color: #0071e3; background: #f0f7ff; }
+
+        /* Price preview */
+        .price-card {
+            background: #f0f7ff; border: 1px solid #91d5ff;
+            border-radius: 10px; padding: 18px 22px;
+            display: flex; align-items: baseline; justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .price-label { font-size: 13px; color: #0050b3; font-weight: 500; }
+        .price-value {
+            font-size: 28px; font-weight: 700; color: #003a8c;
+            font-variant-numeric: tabular-nums;
+        }
+        .price-empty {
+            font-size: 14px; color: #6e6e73; font-style: italic;
+        }
+
+        /* Footer actions */
+        .actions {
+            display: flex; gap: 12px; justify-content: flex-end;
+            border-top: 1px solid #f0f0f0; padding-top: 20px;
+        }
+        .btn {
+            padding: 11px 22px; border-radius: 6px; font-size: 14px;
+            font-weight: 500; text-decoration: none; border: none; cursor: pointer;
+        }
+        .btn-secondary { background: #f5f5f7; color: #1d1d1f; }
+        .btn-primary   { background: #0071e3; color: white; }
+        .btn-primary:disabled { background: #b0b0b3; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Renew Membership</h1>
+        <a th:href="@{/member/membership}" class="top-link">← Back</a>
+    </div>
+
+    <div class="info-banner">
+        Welcome back! Your previous membership has expired. Choose a tier and
+        package below to reactivate your account. Payment is processed online.
+    </div>
+
+    <div class="alert-error" th:if="${error}" th:text="${error}"></div>
+
+    <form method="post" th:action="@{/member/membership/renew}" id="renewForm">
+
+        <h2>Tier</h2>
+        <div>
+            <label class="option" data-tier="CLASSIC">
+                <input type="radio" name="tier" value="CLASSIC" required onchange="updatePrice()">
+                <span class="option-title">CLASSIC</span>
+                <div class="option-sub">Gym + group classes access</div>
+            </label>
+            <label class="option" data-tier="GOLD">
+                <input type="radio" name="tier" value="GOLD" onchange="updatePrice()">
+                <span class="option-title">GOLD</span>
+                <div class="option-sub">Classic + sauna + steam room</div>
+            </label>
+            <label class="option" data-tier="VIP">
+                <input type="radio" name="tier" value="VIP" onchange="updatePrice()">
+                <span class="option-title">VIP</span>
+                <div class="option-sub">Gold + personal trainer sessions + private locker</div>
+            </label>
+        </div>
+
+        <h2>Package</h2>
+        <div>
+            <label class="option" data-pkg="MONTHLY">
+                <input type="radio" name="packageType" value="MONTHLY" required onchange="updatePrice()">
+                <span class="option-title">MONTHLY</span>
+                <div class="option-sub">1 month — most flexible</div>
+            </label>
+            <label class="option" data-pkg="ANNUAL_PREPAID">
+                <input type="radio" name="packageType" value="ANNUAL_PREPAID" onchange="updatePrice()">
+                <span class="option-title">ANNUAL_PREPAID</span>
+                <div class="option-sub">12 months, pay upfront — best value</div>
+            </label>
+            <label class="option" data-pkg="ANNUAL_INSTALLMENT" onchange="updatePrice()">
+                <input type="radio" name="packageType" value="ANNUAL_INSTALLMENT">
+                <span class="option-title">ANNUAL_INSTALLMENT</span>
+                <div class="option-sub">12 months, pay in 12 monthly installments</div>
+            </label>
+        </div>
+
+        <h2>Price</h2>
+        <div class="price-card">
+            <span class="price-label" id="priceLabel">Choose tier and package above</span>
+            <span class="price-value" id="priceValue" style="display:none;">— TL</span>
+        </div>
+
+        <div class="actions">
+            <a th:href="@{/member/membership}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="continueBtn" disabled>
+                Continue to Payment
+            </button>
+        </div>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    // Fee preview map keyed as "TIER|PACKAGE".
+    const feeMap = /*[[${feeByCombo}]]*/ {};
+
+    function updatePrice() {
+        const tier = document.querySelector('input[name="tier"]:checked')?.value;
+        const pkg  = document.querySelector('input[name="packageType"]:checked')?.value;
+
+        // Visual highlight on selected cards
+        document.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+        if (tier) document.querySelector('.option[data-tier="' + tier + '"]')?.classList.add('selected');
+        if (pkg)  document.querySelector('.option[data-pkg="'  + pkg  + '"]')?.classList.add('selected');
+
+        const label = document.getElementById('priceLabel');
+        const value = document.getElementById('priceValue');
+        const btn   = document.getElementById('continueBtn');
+
+        if (tier && pkg) {
+            const key = tier + '|' + pkg;
+            const fee = feeMap[key];
+            if (fee != null) {
+                label.textContent = tier + ' — ' + pkg;
+                value.textContent = fee.toFixed(2) + ' TL';
+                value.style.display = '';
+                btn.disabled = false;
+                return;
+            }
+        }
+        label.textContent = 'Choose tier and package above';
+        value.style.display = 'none';
+        btn.disabled = true;
+    }
+</script>
+</body>
+</html>

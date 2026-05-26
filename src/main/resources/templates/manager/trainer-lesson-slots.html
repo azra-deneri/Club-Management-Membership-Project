@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lesson Slots — ISC-MS</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 720px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 22px; }
+        .header .subtitle { font-size: 13px; color: #6e6e73; margin-top: 4px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #135200; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        .alert-info    { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px;
+                background: #fafafa; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+        th { text-align: left; padding: 10px 12px; font-size: 11px; color: #6e6e73;
+             text-transform: uppercase; letter-spacing: 0.5px;
+             border-bottom: 1px solid #e0e0e3; background: #f5f5f7; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; color: #1d1d1f; }
+        td select, td input[type=time] {
+            padding: 6px 8px; font-size: 13px;
+            border: 1px solid #d2d2d7; border-radius: 4px;
+            font-family: inherit; background: white;
+        }
+        .btn-row-remove {
+            padding: 4px 8px; font-size: 11px; border-radius: 4px;
+            background: #fff2f0; color: #cf1322; border: 1px solid #ffccc7;
+            cursor: pointer; font-weight: 500;
+        }
+        .add-row {
+            background: #f0f7ff; border: 1px dashed #91d5ff;
+            padding: 8px 12px; font-size: 12px; color: #0050b3;
+            border-radius: 6px; cursor: pointer; width: 100%;
+            text-align: center; margin-bottom: 12px;
+        }
+        .actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+        .btn { padding: 10px 20px; border-radius: 6px; font-size: 14px;
+               text-decoration: none; border: none; cursor: pointer; font-weight: 500; }
+        .btn-primary   { background: #0071e3; color: white; }
+        .btn-secondary { background: #f5f5f7; color: #1d1d1f; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>Lesson Slots</h1>
+            <div class="subtitle" th:text="${trainer.fullName} + ' · ' + ${trainer.specialty}">Trainer · Specialty</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <a th:href="@{|/manager/trainers/${trainer.trainerId}/working-days|}" class="top-link">Working Days</a>
+            <a th:href="@{/manager/trainers}" class="top-link">← Back to Trainers</a>
+        </div>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <div class="alert alert-info">
+        Each slot is a bookable PT time block. Slots must fall within the trainer's working hours.
+        Duplicate slots (same day + start + end) are not allowed.
+    </div>
+
+    <form method="post" th:action="@{|/manager/trainers/${trainer.trainerId}/lesson-slots|}" id="slot-form">
+        <table>
+            <thead>
+            <tr>
+                <th>Day</th>
+                <th>Start</th>
+                <th>End</th>
+                <th style="width: 60px;"></th>
+            </tr>
+            </thead>
+            <tbody id="slot-tbody">
+            <tr th:each="r, st : ${rows}">
+                <td>
+                    <select th:name="|slot_day_${st.index}|">
+                        <option value="MONDAY"    th:selected="${r.day == 'MONDAY'}">MONDAY</option>
+                        <option value="TUESDAY"   th:selected="${r.day == 'TUESDAY'}">TUESDAY</option>
+                        <option value="WEDNESDAY" th:selected="${r.day == 'WEDNESDAY'}">WEDNESDAY</option>
+                        <option value="THURSDAY"  th:selected="${r.day == 'THURSDAY'}">THURSDAY</option>
+                        <option value="FRIDAY"    th:selected="${r.day == 'FRIDAY'}">FRIDAY</option>
+                        <option value="SATURDAY"  th:selected="${r.day == 'SATURDAY'}">SATURDAY</option>
+                        <option value="SUNDAY"    th:selected="${r.day == 'SUNDAY'}">SUNDAY</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="time" th:name="|slot_start_${st.index}|" th:value="${r.start}" step="60"/>
+                </td>
+                <td>
+                    <input type="time" th:name="|slot_end_${st.index}|" th:value="${r.end}" step="60"/>
+                </td>
+                <td>
+                    <button type="button" class="btn-row-remove" onclick="this.closest('tr').remove();">×</button>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <button type="button" class="add-row" onclick="addSlotRow()">+ Add Lesson Slot</button>
+
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Save Lesson Slots</button>
+            <a th:href="@{/manager/trainers}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Add an empty row. The server reads slot_day_N, slot_start_N, slot_end_N.
+    function addSlotRow() {
+        const tbody = document.getElementById('slot-tbody');
+        const idx = tbody.querySelectorAll('tr').length;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <select name="slot_day_${idx}">
+                    <option value="MONDAY">MONDAY</option>
+                    <option value="TUESDAY">TUESDAY</option>
+                    <option value="WEDNESDAY">WEDNESDAY</option>
+                    <option value="THURSDAY">THURSDAY</option>
+                    <option value="FRIDAY">FRIDAY</option>
+                    <option value="SATURDAY">SATURDAY</option>
+                    <option value="SUNDAY">SUNDAY</option>
+                </select>
+            </td>
+            <td><input type="time" name="slot_start_${idx}" step="60"/></td>
+            <td><input type="time" name="slot_end_${idx}" step="60"/></td>
+            <td><button type="button" class="btn-row-remove" onclick="this.closest('tr').remove();">×</button></td>
+        `;
+        tbody.appendChild(tr);
+    }
+</script>
+</body>
+</html>

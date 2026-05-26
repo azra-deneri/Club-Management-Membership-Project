@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — Installments</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 960px; margin: 40px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 24px; }
+        h1 { margin: 0; color: #1d1d1f; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .summary {
+            display: flex; gap: 12px; margin-bottom: 20px;
+        }
+        .summary .box {
+            flex: 1; padding: 14px 16px; border-radius: 8px;
+            border: 1px solid #e0e0e3; text-align: center;
+        }
+        .summary .label { font-size: 11px; color: #6e6e73;
+                          text-transform: uppercase; letter-spacing: 0.5px; }
+        .summary .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+        .box-paid    .value { color: #389e0d; }
+        .box-pending .value { color: #ad6800; }
+        .box-overdue .value { color: #cf1322; }
+        .alert {
+            padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+        }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        .alert-warn    { background: #fffbe6; border: 1px solid #ffe58f; color: #ad6800; }
+        .alert-info    { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th {
+            text-align: left; padding: 12px 10px; background: #f9f9fb;
+            border-bottom: 1px solid #e0e0e3; color: #6e6e73; font-weight: 500;
+            text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;
+        }
+        tbody td { padding: 12px 10px; border-bottom: 1px solid #f5f5f7; }
+        tr.row-OVERDUE { background: #fff5f5; }
+        tr.row-PAID    { background: #fafffa; }
+        .pill {
+            display: inline-block; padding: 2px 9px; border-radius: 10px;
+            font-size: 11px; font-weight: 500;
+        }
+        .pill-PAID    { background: #f6ffed; color: #389e0d; }
+        .pill-PENDING { background: #fffbe6; color: #ad6800; }
+        .pill-OVERDUE { background: #fff2f0; color: #cf1322; }
+        .pay-btn {
+            display: inline-block; padding: 6px 12px;
+            background: #389e0d; color: white;
+            text-decoration: none; border-radius: 5px; font-size: 12px;
+        }
+        .pay-btn:hover { background: #2f8009; }
+        .empty { text-align: center; padding: 60px 20px; color: #6e6e73; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Installments</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <div class="alert alert-warn" th:if="${onPaymentHold}">
+        Your account is on <strong>Payment Hold</strong> because you have
+        3+ overdue installments. Pay the oldest overdue row below to restore access.
+    </div>
+
+    <div class="alert alert-info" th:if="${earliestUnpaidId != null}">
+        Installments must be paid in chronological order.
+        Only the <strong>oldest unpaid installment</strong> is currently payable.
+    </div>
+
+    <div class="summary" th:if="${!#lists.isEmpty(installments)}">
+        <div class="box box-paid">
+            <div class="label">Paid</div>
+            <div class="value" th:text="${countPaid}">0</div>
+        </div>
+        <div class="box box-pending">
+            <div class="label">Pending</div>
+            <div class="value" th:text="${countPending}">0</div>
+        </div>
+        <div class="box box-overdue">
+            <div class="label">Overdue</div>
+            <div class="value" th:text="${countOverdue}">0</div>
+        </div>
+    </div>
+
+    <div th:if="${#lists.isEmpty(installments)}" class="empty">
+        No installments on record. You only have installments if you bought
+        an annual membership on the monthly payment plan.
+    </div>
+
+    <table th:if="${!#lists.isEmpty(installments)}">
+        <thead>
+        <tr>
+            <th>#</th>
+            <th>Due Date</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Paid On</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="i : ${installments}"
+            th:classappend="'row-' + ${i.status}">
+            <td th:text="${i.installmentNo} + '/12'">1/12</td>
+            <td th:text="${i.dueDate}">2026-02-04</td>
+            <td th:text="${#numbers.formatDecimal(i.amount, 1, 2) + ' TL'}">0.00 TL</td>
+            <td>
+                    <span class="pill"
+                          th:classappend="'pill-' + ${i.status}"
+                          th:text="${i.status}">PENDING</span>
+            </td>
+            <td th:text="${i.paidDate != null} ? ${i.paidDate.toLocalDate()} : '—'">—</td>
+            <td>
+                <!-- Phase 2: Pay Now only on the single earliest unpaid installment (BR-76) -->
+                <a th:if="${i.installmentId == earliestUnpaidId}"
+                   th:href="@{'/member/installments/' + ${i.installmentId} + '/pay'}"
+                   class="pay-btn">Pay Now</a>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

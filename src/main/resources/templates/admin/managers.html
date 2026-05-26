@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Managers — ISC-MS Admin</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 1100px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
+        }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        .header-actions { display: flex; gap: 8px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .btn-primary {
+            padding: 8px 16px; background: #0071e3; color: white;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+            font-weight: 500;
+        }
+
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #135200; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        thead { background: #fafafa; }
+        th, td { padding: 12px 14px; text-align: left; font-size: 13px;
+                 border-bottom: 1px solid #f0f0f0; }
+        th { font-weight: 600; color: #6e6e73; text-transform: uppercase;
+             letter-spacing: 0.4px; font-size: 11px; }
+
+        .pill { display: inline-block; padding: 2px 10px; border-radius: 12px;
+                font-size: 11px; font-weight: 600; }
+        .pill-role-ADMIN   { background: #f0e7ff; color: #3c1e64; }
+        .pill-role-MANAGER { background: #e6f4ff; color: #0050b3; }
+        .pill-locked       { background: #fff1f0; color: #a8071a; }
+        .pill-active       { background: #f6ffed; color: #135200; }
+
+        .btn-sm {
+            padding: 4px 10px; font-size: 11px; border-radius: 4px;
+            border: none; cursor: pointer; font-weight: 500;
+        }
+        .btn-lock   { background: #d48806; color: white; }
+        .btn-delete { background: #cf1322; color: white; }
+        form.inline-form { display: inline; margin-right: 4px; }
+
+        .self-tag { color: #6e6e73; font-size: 11px; font-style: italic; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Managers</h1>
+        <div class="header-actions">
+            <a th:href="@{/admin/managers/new}" class="btn-primary">+ Add Manager</a>
+            <a th:href="@{/admin/dashboard}" class="top-link">← Back to Admin</a>
+        </div>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <table th:if="${!managers.isEmpty()}">
+        <thead>
+        <tr>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th style="text-align:right;">Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="m : ${managers}">
+            <td th:text="${m.fullName}">Manager</td>
+            <td th:text="${m.email}">email</td>
+            <td>
+                <span class="pill" th:classappend="'pill-role-' + ${m.role}"
+                      th:text="${m.role}">MANAGER</span>
+            </td>
+            <td>
+                <span class="pill pill-locked" th:if="${m.locked}">LOCKED</span>
+                <span class="pill pill-active" th:if="${!m.locked}">ACTIVE</span>
+            </td>
+            <td style="text-align:right;">
+                <span th:if="${m.managerId == admin.managerId}" class="self-tag">(you)</span>
+                <form th:unless="${m.managerId == admin.managerId}"
+                      class="inline-form" method="post"
+                      th:action="@{|/admin/managers/${m.managerId}/lock-toggle|}">
+                    <button type="submit" class="btn-sm btn-lock"
+                            th:text="${m.locked} ? 'Unlock' : 'Lock'">Lock</button>
+                </form>
+                <form th:unless="${m.managerId == admin.managerId}"
+                      class="inline-form" method="post"
+                      th:action="@{|/admin/managers/${m.managerId}/delete|}"
+                      onsubmit="return confirm('Delete this manager? This cannot be undone.');">
+                    <button type="submit" class="btn-sm btn-delete">Delete</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div th:if="${managers.isEmpty()}"
+         style="text-align:center; padding:24px; color:#6e6e73; font-style:italic;">
+        No manager accounts found.
+    </div>
+</div>
+</body>
+</html>

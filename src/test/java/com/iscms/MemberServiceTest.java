@@ -229,7 +229,7 @@ public class MemberServiceTest {
     // --- Registration Approval / Rejection Tests ---
 
     @Test
-    void rejectRegistration_initial_deletesMember() {
+    void rejectRegistration_initial_marksRejectedAndDeletesMember() {
         RegistrationRequest req = new RegistrationRequest();
         req.setRequestId(1);
         req.setMemberId(42);
@@ -239,7 +239,11 @@ public class MemberServiceTest {
 
         memberService.rejectRegistration(1);
 
-        verify(requestDAO, times(1)).deleteRegistration(1);
+        // Soft delete: the request stays in the DB with REJECTED status for
+        // audit, and the placeholder member is removed so the same phone/email
+        // can register again.
+        verify(requestDAO, times(1)).updateRegistrationStatus(1, "REJECTED");
+        verify(requestDAO, never()).deleteRegistration(anyInt());
         verify(memberDAO, times(1)).deleteById(42);
     }
 
@@ -259,16 +263,18 @@ public class MemberServiceTest {
     }
 
     @Test
-    void rejectRegistration_deletesTheMember() {
+    void rejectRegistration_defaultType_marksRejectedAndDeletesMember() {
         RegistrationRequest req = new RegistrationRequest();
         req.setRequestId(1);
         req.setMemberId(42);
+        // No type set — treated as non-renewal, same path as INITIAL/NEW.
         when(requestDAO.findPendingRegistrations())
                 .thenReturn(new ArrayList<>(List.of(req)));
 
         memberService.rejectRegistration(1);
 
-        verify(requestDAO, times(1)).deleteRegistration(1);
+        verify(requestDAO, times(1)).updateRegistrationStatus(1, "REJECTED");
+        verify(requestDAO, never()).deleteRegistration(anyInt());
         verify(memberDAO, times(1)).deleteById(42);
     }
 

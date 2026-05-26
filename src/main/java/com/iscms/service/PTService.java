@@ -301,4 +301,28 @@ public class PTService {
     public boolean isSlotTaken(int trainerId, LocalDate date, LocalTime start, LocalTime end) {
         return appointmentDAO.isSlotTaken(trainerId, date, start, end);
     }
+
+    // === Trainer-action eligibility helpers (web layer view-models) ===========
+    // These predicates centralize "can the trainer act on this appointment?"
+    // business rules so neither the controller nor the view has to evaluate
+    // them inline. Keeping the rules here keeps the view a pure presentation
+    // layer and the controller a thin wiring layer.
+
+    // True when the trainer is allowed to mark an outcome (Complete or No-Show)
+    // for the given appointment: it must still be SCHEDULED and its date must
+    // not be in the future (today or earlier — i.e. the session has happened
+    // or is happening now).
+    public boolean canMarkOutcome(PersonalTrainingAppointment apt, LocalDate today) {
+        if (apt == null || today == null) return false;
+        if (!"SCHEDULED".equalsIgnoreCase(apt.getStatus())) return false;
+        return !apt.getAppointmentDate().isAfter(today);
+    }
+
+    // True when the trainer is allowed to cancel the appointment.
+    // Trainers may cancel any SCHEDULED appointment, regardless of date —
+    // a late cancellation still has to be reflected so the member is informed.
+    public boolean canTrainerCancel(PersonalTrainingAppointment apt) {
+        if (apt == null) return false;
+        return "SCHEDULED".equalsIgnoreCase(apt.getStatus());
+    }
 }

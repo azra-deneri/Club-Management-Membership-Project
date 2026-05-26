@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — My Profile</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 700px; margin: 40px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 24px; }
+        h1 { margin: 0; color: #1d1d1f; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .row { display: grid; grid-template-columns: 180px 1fr; gap: 12px;
+               align-items: center; margin-bottom: 12px; }
+        label { font-weight: 500; color: #1d1d1f; }
+        input[type=text], input[type=email], input[type=number] {
+            width: 100%; padding: 9px 10px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            font-size: 14px; box-sizing: border-box;
+        }
+        input[readonly] { background: #f5f5f7; color: #6e6e73; }
+        input[disabled] { background: #f5f5f7; color: #6e6e73; cursor: not-allowed; }
+        button {
+            margin-top: 20px; padding: 12px 24px;
+            background: #0071e3; color: white; border: none;
+            border-radius: 6px; font-size: 15px; cursor: pointer;
+        }
+        button:hover { background: #0077ed; }
+        button:disabled { background: #c7c7cc; cursor: not-allowed; }
+        .alert { padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
+        .alert-warn    { background: #fffbe6; border: 1px solid #ffe58f; color: #ad6800; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>My Profile</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-warn"    th:if="${onPaymentHold}">
+        Your account is on Payment Hold. Profile editing is disabled until your
+        overdue installments are paid.
+    </div>
+
+    <form th:action="@{/member/profile}" method="post">
+
+        <div class="row">
+            <label>Full Name</label>
+            <input type="text" th:value="${member.fullName}" readonly />
+        </div>
+
+        <div class="row">
+            <label>Date of Birth</label>
+            <input type="text" th:value="${member.dateOfBirth}" readonly />
+        </div>
+
+        <div class="row">
+            <label>Phone</label>
+            <input type="text" name="phone"
+                   th:value="${member.phone}"
+                   th:disabled="${onPaymentHold}"
+                   pattern="\d{10}" maxlength="10"
+                   title="Exactly 10 digits"
+                   required />
+        </div>
+
+        <div class="row">
+            <label>Email</label>
+            <input type="email" name="email"
+                   th:value="${member.email}"
+                   th:disabled="${onPaymentHold}" />
+        </div>
+
+        <div class="row">
+            <label>Weight (kg)</label>
+            <input type="number" step="0.1" name="weight"
+                   th:value="${member.weight}"
+                   th:disabled="${onPaymentHold}" />
+        </div>
+
+        <div class="row">
+            <label>Height (cm)</label>
+            <input type="number" step="0.1" name="height"
+                   th:value="${member.height}"
+                   th:disabled="${onPaymentHold}" />
+        </div>
+
+        <div class="row">
+            <label>Emergency Contact</label>
+            <input type="text" name="emergencyContactName"
+                   th:value="${member.emergencyContactName}"
+                   th:disabled="${onPaymentHold}" />
+        </div>
+
+        <div class="row">
+            <label>Emergency Phone</label>
+            <input type="text" name="emergencyContactPhone"
+                   th:value="${member.emergencyContactPhone}"
+                   th:disabled="${onPaymentHold}" />
+        </div>
+
+        <button type="submit" th:disabled="${onPaymentHold}">
+            <span th:if="${!onPaymentHold}">Save Changes</span>
+            <span th:if="${onPaymentHold}">Editing disabled (Payment Hold)</span>
+        </button>
+    </form>
+</div>
+</body>
+</html>

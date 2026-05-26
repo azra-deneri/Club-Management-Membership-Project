@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — Login</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 400px; margin: 80px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        h1 { margin-top: 0; color: #1d1d1f; }
+        label { display: block; margin-top: 16px; font-weight: 500; }
+        input, select {
+            width: 100%; padding: 10px; margin-top: 4px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            font-size: 14px; box-sizing: border-box;
+        }
+        button {
+            margin-top: 24px; width: 100%; padding: 12px;
+            background: #0071e3; color: white; border: none;
+            border-radius: 6px; font-size: 15px; cursor: pointer;
+        }
+        button:hover { background: #0077ed; }
+        .footer { margin-top: 16px; text-align: center; font-size: 13px; }
+        .footer a { color: #0071e3; text-decoration: none; }
+        .error {
+            margin-top: 16px; padding: 10px 12px;
+            background: #fff2f0; border: 1px solid #ffccc7;
+            color: #cf1322; border-radius: 6px; font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>ISC-MS Login</h1>
+
+    <div class="error" th:if="${error}" th:text="${error}"></div>
+
+    <form th:action="@{/login}" method="post">
+        <label>Role</label>
+        <select name="role" id="roleSelect" onchange="updateIdentifierLabel()">
+            <option value="MEMBER"  th:selected="${role == 'MEMBER'  or role == null}">Member</option>
+            <option value="MANAGER" th:selected="${role == 'MANAGER'}">Manager</option>
+            <option value="TRAINER" th:selected="${role == 'TRAINER'}">Trainer</option>
+            <option value="ADMIN"   th:selected="${role == 'ADMIN'}">Admin</option>
+        </select>
+
+        <label id="identifierLabel">Phone</label>
+        <input type="text" name="identifier" id="identifierInput"
+               th:value="${identifier}" required />
+
+        <label>Password</label>
+        <input type="password" name="password" required />
+
+        <button type="submit">Sign In</button>
+    </form>
+
+    <div class="footer">
+        <a th:href="@{/register}">New Member Registration</a> •
+        <a th:href="@{/forgot-password}">Forgot Password</a>
+    </div>
+</div>
+
+<script>
+    // Switches the identifier field's label and placeholder based on the
+    // selected role, mirroring Project 1's LoginFrame behavior:
+    //   Member  -> phone
+    //   Manager -> email
+    //   Trainer -> username
+    //   Admin   -> email
+    function updateIdentifierLabel() {
+        var role = document.getElementById('roleSelect').value;
+        var label = document.getElementById('identifierLabel');
+        var input = document.getElementById('identifierInput');
+
+        if (role === 'MEMBER') {
+            label.textContent = 'Phone';
+            input.placeholder = 'e.g. 5551234567';
+            input.type = 'tel';
+        } else if (role === 'TRAINER') {
+            label.textContent = 'Username';
+            input.placeholder = 'e.g. trainer1';
+            input.type = 'text';
+        } else {
+            // MANAGER and ADMIN both use email
+            label.textContent = 'Email';
+            input.placeholder = 'e.g. manager@isc.com';
+            input.type = 'email';
+        }
+    }
+
+    // Run once on page load to sync the label with the pre-selected role
+    // (important after a failed login attempt where the role is preserved)
+    updateIdentifierLabel();
+</script>
+</body>
+</html>

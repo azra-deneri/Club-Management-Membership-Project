@@ -325,4 +325,72 @@ public class AuthServiceTest {
         t.setPassword("placeholder");
         return t;
     }
+
+    // --- changeTrainerPasswordSelf Tests (G1) ---
+    // These tests verify that all business rules for trainer password change
+    // live in AuthService (not in the controller): length check, current
+    // password verification, same-as-old rejection, and DAO persistence.
+
+    @Test
+    void changeTrainerPasswordSelf_validRequest_returnsSuccessAndHashesPassword() {
+        // Arrange: trainer with BCrypt hash of "oldpass1"
+        String oldHash = org.mindrot.jbcrypt.BCrypt.hashpw("oldpass1",
+                org.mindrot.jbcrypt.BCrypt.gensalt(4));
+        Trainer t = new Trainer();
+        t.setTrainerId(1);
+        t.setPassword(oldHash);
+
+        // Act
+        AuthService.ResetResult result =
+                authService.changeTrainerPasswordSelf(t, "oldpass1", "newpass2");
+
+        // Assert
+        assertEquals(AuthService.ResetResult.SUCCESS, result);
+        verify(trainerDAO).updatePassword(eq(1), anyString());
+        // Session-sync contract: in-memory trainer object reflects new hash
+        assertTrue(org.mindrot.jbcrypt.BCrypt.checkpw("newpass2", t.getPassword()));
+    }
+
+    @Test
+    void changeTrainerPasswordSelf_tooShortPassword_throwsAndDoesNotPersist() {
+        String oldHash = org.mindrot.jbcrypt.BCrypt.hashpw("oldpass1",
+                org.mindrot.jbcrypt.BCrypt.gensalt(4));
+        Trainer t = new Trainer();
+        t.setTrainerId(1);
+        t.setPassword(oldHash);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.changeTrainerPasswordSelf(t, "oldpass1", "abc"));
+        assertTrue(ex.getMessage().toLowerCase().contains("6 characters"));
+        verify(trainerDAO, never()).updatePassword(anyInt(), anyString());
+    }
+
+    @Test
+    void changeTrainerPasswordSelf_wrongCurrentPassword_throwsAndDoesNotPersist() {
+        String oldHash = org.mindrot.jbcrypt.BCrypt.hashpw("oldpass1",
+                org.mindrot.jbcrypt.BCrypt.gensalt(4));
+        Trainer t = new Trainer();
+        t.setTrainerId(1);
+        t.setPassword(oldHash);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.changeTrainerPasswordSelf(t, "wrongpass", "newpass2"));
+        assertTrue(ex.getMessage().toLowerCase().contains("incorrect"));
+        verify(trainerDAO, never()).updatePassword(anyInt(), anyString());
+    }
+
+    @Test
+    void changeTrainerPasswordSelf_sameAsOld_returnsSameAsOldAndDoesNotPersist() {
+        String oldHash = org.mindrot.jbcrypt.BCrypt.hashpw("samepass",
+                org.mindrot.jbcrypt.BCrypt.gensalt(4));
+        Trainer t = new Trainer();
+        t.setTrainerId(1);
+        t.setPassword(oldHash);
+
+        AuthService.ResetResult result =
+                authService.changeTrainerPasswordSelf(t, "samepass", "samepass");
+
+        assertEquals(AuthService.ResetResult.SAME_AS_OLD, result);
+        verify(trainerDAO, never()).updatePassword(anyInt(), anyString());
+    }
 }

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${mode == 'create' ? 'New Event' : 'Edit Event'} + ' — ISC-MS'">New Event</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 720px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-error { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        .alert-info  { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+
+        .field { margin-bottom: 14px; }
+        .field label {
+            display: block; font-size: 12px; color: #6e6e73;
+            margin-bottom: 4px; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .field input, .field select, .field textarea {
+            width: 100%; padding: 10px 12px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            box-sizing: border-box; background: white;
+            font-family: inherit;
+        }
+        .field textarea { resize: vertical; min-height: 80px; }
+        .field input:focus, .field select:focus, .field textarea:focus {
+            outline: none; border-color: #0071e3;
+        }
+        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 520px) { .row-2 { grid-template-columns: 1fr; } }
+
+        .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        .btn {
+            padding: 11px 22px; border-radius: 6px; font-size: 14px;
+            text-decoration: none; border: none; cursor: pointer; font-weight: 500;
+        }
+        .btn-primary   { background: #0071e3; color: white; }
+        .btn-secondary { background: #f5f5f7; color: #1d1d1f; }
+        .required { color: #cf1322; }
+        .hint { font-size: 11px; color: #6e6e73; margin-top: 4px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1 th:text="${mode == 'create' ? 'New Event' : 'Edit Event'}">New Event</h1>
+        <a th:href="@{/manager/events}" class="top-link">← Back to Events</a>
+    </div>
+
+    <div class="alert alert-error" th:if="${error}" th:text="${error}"></div>
+
+    <div class="alert alert-info" th:if="${mode == 'edit'}">
+        Capacity is changed separately on the event detail page (capacity can only be <em>increased</em>).
+    </div>
+
+    <form method="post"
+          th:action="${mode == 'create' ? '/manager/events' : '/manager/events/' + eventId}"
+          th:object="${form}">
+
+        <div class="field">
+            <label>Event Name <span class="required">*</span></label>
+            <input type="text" th:field="*{eventName}" required maxlength="100"/>
+        </div>
+
+        <div class="row-2">
+            <div class="field">
+                <label>Category <span class="required">*</span></label>
+                <select th:field="*{category}" required>
+                    <option value="FITNESS">Fitness</option>
+                    <option value="YOGA">Yoga</option>
+                    <option value="SWIMMING">Swimming</option>
+                    <option value="HIIT">HIIT</option>
+                    <option value="WORKSHOP">Workshop</option>
+                    <option value="OTHER">Other</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Event Date <span class="required">*</span></label>
+                <input type="date" th:field="*{eventDate}"
+                       th:min="${T(java.time.LocalDate).now().plusDays(1)}"
+                       required/>
+                <div class="hint">Must be tomorrow or later.</div>
+            </div>
+        </div>
+
+        <div class="row-2">
+            <div class="field">
+                <label>Start Time <span class="required">*</span></label>
+                <input type="time" th:field="*{startTime}" step="60" required/>
+                <div class="hint">24-hour format (e.g. 14:30).</div>
+            </div>
+            <div class="field">
+                <label>End Time <span class="required">*</span></label>
+                <input type="time" th:field="*{endTime}" step="60" required/>
+                <div class="hint">Must be after start time.</div>
+            </div>
+        </div>
+
+        <div class="field">
+            <label>Location</label>
+            <input type="text" th:field="*{location}" maxlength="100"/>
+        </div>
+
+        <div class="field" th:if="${mode == 'create'}">
+            <label>Capacity <span class="required">*</span></label>
+            <input type="number" th:field="*{capacity}" min="1" required/>
+            <div class="hint">After creation, capacity can only be increased (not decreased) via the event detail page.</div>
+        </div>
+
+        <div class="field">
+            <label>Description</label>
+            <textarea th:field="*{description}" maxlength="500"></textarea>
+        </div>
+
+        <div class="actions">
+            <button type="submit" class="btn btn-primary"
+                    th:text="${mode == 'create' ? 'Create Event' : 'Save Changes'}">Create Event</button>
+            <a th:href="@{/manager/events}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+</body>
+</html>

@@ -450,4 +450,73 @@ public class PTServiceTest {
         apt.setStatus(status);
         return apt;
     }
+
+    // --- Trainer-action eligibility helpers (G4) ---
+    // canMarkOutcome and canTrainerCancel encode the "can the trainer act on
+    // this appointment?" rules. These were previously inline in the controller
+    // and the view template — pulled into PTService so both layers can rely
+    // on the same authoritative answer.
+
+    @Test
+    void canMarkOutcome_scheduledAndPast_returnsTrue() {
+        PersonalTrainingAppointment a = new PersonalTrainingAppointment();
+        a.setStatus("SCHEDULED");
+        a.setAppointmentDate(LocalDate.of(2026, 5, 1));
+
+        assertTrue(ptService.canMarkOutcome(a, LocalDate.of(2026, 5, 26)));
+    }
+
+    @Test
+    void canMarkOutcome_scheduledAndToday_returnsTrue() {
+        PersonalTrainingAppointment a = new PersonalTrainingAppointment();
+        a.setStatus("SCHEDULED");
+        LocalDate today = LocalDate.of(2026, 5, 26);
+        a.setAppointmentDate(today);
+
+        assertTrue(ptService.canMarkOutcome(a, today));
+    }
+
+    @Test
+    void canMarkOutcome_scheduledButFuture_returnsFalse() {
+        PersonalTrainingAppointment a = new PersonalTrainingAppointment();
+        a.setStatus("SCHEDULED");
+        a.setAppointmentDate(LocalDate.of(2026, 6, 10));
+
+        assertFalse(ptService.canMarkOutcome(a, LocalDate.of(2026, 5, 26)));
+    }
+
+    @Test
+    void canMarkOutcome_alreadyCompleted_returnsFalse() {
+        PersonalTrainingAppointment a = new PersonalTrainingAppointment();
+        a.setStatus("COMPLETED");
+        a.setAppointmentDate(LocalDate.of(2026, 5, 1));
+
+        assertFalse(ptService.canMarkOutcome(a, LocalDate.of(2026, 5, 26)));
+    }
+
+    @Test
+    void canTrainerCancel_scheduledRegardlessOfDate_returnsTrue() {
+        PersonalTrainingAppointment future = new PersonalTrainingAppointment();
+        future.setStatus("SCHEDULED");
+        future.setAppointmentDate(LocalDate.of(2026, 7, 1));
+
+        PersonalTrainingAppointment past = new PersonalTrainingAppointment();
+        past.setStatus("SCHEDULED");
+        past.setAppointmentDate(LocalDate.of(2026, 4, 1));
+
+        assertTrue(ptService.canTrainerCancel(future));
+        assertTrue(ptService.canTrainerCancel(past));
+    }
+
+    @Test
+    void canTrainerCancel_alreadyCancelledOrCompleted_returnsFalse() {
+        PersonalTrainingAppointment cancelled = new PersonalTrainingAppointment();
+        cancelled.setStatus("CANCELLED");
+
+        PersonalTrainingAppointment completed = new PersonalTrainingAppointment();
+        completed.setStatus("COMPLETED");
+
+        assertFalse(ptService.canTrainerCancel(cancelled));
+        assertFalse(ptService.canTrainerCancel(completed));
+    }
 }

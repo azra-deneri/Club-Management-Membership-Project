@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="06cc4173-bd97-4bab-bc48-a91a6eb413dc" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/IscmsApplication.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/AdminController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/BMIController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/EventController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/HomeController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/PTController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/TrainerController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/application.properties" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/dashboard.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/manager-form.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/managers.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/payments.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/profile.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/login.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/add-member.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/appointments.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/event-detail.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/events.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/members.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/profile.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/reports.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/trainer-form.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/trainer-lesson-slots.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/trainer-working-days.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/trainers.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/member/bmi.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/member/events.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/member/pt.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/member/renew.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/trainer/appointments.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/trainer/dashboard.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/trainer/profile.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/dao/MembershipDAO.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/dao/MembershipDAO.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/dao/MembershipDAOImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/dao/MembershipDAOImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/AuthService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/AuthService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/ManagerService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/ManagerService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/MemberService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/MemberService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/PTService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/PTService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/ReportService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/ReportService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/HelloServlet.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/webapp/WEB-INF/web.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/webapp/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/java/com/iscms/AuthServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/iscms/AuthServiceTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/java/com/iscms/MemberServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/iscms/MemberServiceTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/java/com/iscms/PTServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/iscms/PTServiceTest.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="HTML File" />
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
+  <component name="ProjectId" id="3BoelEC9ayvU9tqSHlvZ0HZonP7" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.Main.executor": "Run",
+    "DefaultHtmlFileTemplate": "HTML File",
+    "JUnit.All in ISC-MS_final.executor": "Run",
+    "JUnit.All in isc-ms.executor": "Run",
+    "JUnit.AuthServiceTest.executor": "Run",
+    "JUnit.EventBuilderTest.executor": "Run",
+    "JUnit.EventFactoryTest.executor": "Run",
+    "JUnit.EventServiceTest.executor": "Run",
+    "JUnit.MemberBuilderTest.executor": "Run",
+    "JUnit.MemberServiceTest.rejectRegistration_initial_deletesMember.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "git-widget-placeholder": "master",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/Users/azradeneri/Desktop/Advanced Java Project 1 Final/ISC-MS Project 1",
+    "onboarding.tips.debug.path": "/Users/azradeneri/Desktop/ISC-MS Project 1/src/main/java/com/iscms/Main.java",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "preferences.lookFeel"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src/main/resources/templates" />
+      <recent name="$PROJECT_DIR$/src/main/webapp" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Application.Main">
+    <configuration name="Main" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.iscms.Main" />
+      <module name="isc-ms" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.iscms.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="All in isc-ms" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="isc-ms" />
+      <option name="PACKAGE_NAME" value="" />
+      <option name="MAIN_CLASS_NAME" value="" />
+      <option name="METHOD_NAME" value="" />
+      <option name="TEST_OBJECT" value="package" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="AuthServiceTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="isc-ms" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.iscms.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.iscms" />
+      <option name="MAIN_CLASS_NAME" value="com.iscms.AuthServiceTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="EventBuilderTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="isc-ms" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.iscms.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.iscms" />
+      <option name="MAIN_CLASS_NAME" value="com.iscms.EventBuilderTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="MemberServiceTest.rejectRegistration_initial_deletesMember" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="isc-ms" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.iscms.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.iscms" />
+      <option name="MAIN_CLASS_NAME" value="com.iscms.MemberServiceTest" />
+      <option name="METHOD_NAME" value="rejectRegistration_initial_deletesMember" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="ISC-MS Project 1" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Application.Main" />
+        <item itemvalue="JUnit.All in isc-ms" />
+        <item itemvalue="JUnit.EventBuilderTest" />
+        <item itemvalue="JUnit.AuthServiceTest" />
+        <item itemvalue="JUnit.MemberServiceTest.rejectRegistration_initial_deletesMember" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="06cc4173-bd97-4bab-bc48-a91a6eb413dc" name="Changes" comment="" />
+      <created>1775159998837</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1775159998837</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java</url>
+          <line>1123</line>
+          <properties>
+            <option name="lambda-ordinal" value="-1" />
+          </properties>
+          <option name="timeStamp" value="2" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>

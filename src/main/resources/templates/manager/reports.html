@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports — ISC-MS</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 1200px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        h2 { color: #1d1d1f; font-size: 18px; margin: 24px 0 12px;
+             padding-bottom: 6px; border-bottom: 2px solid #f0f0f0; }
+        h2 .count {
+            font-size: 12px; color: #6e6e73; font-weight: 500;
+            margin-left: 8px;
+        }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+
+        .tabs { display: flex; gap: 4px; border-bottom: 1px solid #e0e0e3;
+                margin-bottom: 16px; flex-wrap: wrap; }
+        .tab {
+            padding: 10px 16px; cursor: pointer; font-size: 13px;
+            color: #6e6e73; border-bottom: 2px solid transparent;
+            background: none; border-left: none; border-right: none;
+            border-top: none; font-family: inherit;
+        }
+        .tab.active { color: #0071e3; border-bottom-color: #0071e3; font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px; margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #fafafa; border: 1px solid #ececec;
+            border-radius: 8px; padding: 14px 16px;
+        }
+        .stat-label {
+            font-size: 11px; color: #6e6e73; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 6px;
+        }
+        .stat-value { font-size: 22px; color: #1d1d1f; font-weight: 600; }
+        .stat-value.money { color: #0050b3; }
+
+        .filter-bar {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+            background: #fafafa; border: 1px solid #ececec; border-radius: 8px;
+            padding: 10px 12px; margin-bottom: 12px;
+        }
+        .filter-bar select {
+            padding: 6px 10px; font-size: 12px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            background: white; cursor: pointer;
+        }
+        .filter-bar .btn-apply  {
+            background: #0071e3; color: white; padding: 6px 14px;
+            font-size: 12px; border-radius: 6px; border: none; cursor: pointer;
+        }
+        .filter-bar .btn-reset  {
+            background: #f5f5f7; color: #1d1d1f; padding: 6px 14px;
+            font-size: 12px; border-radius: 6px; text-decoration: none;
+        }
+        .filter-bar .row-count  {
+            font-size: 11px; color: #6e6e73; margin-left: auto;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead { background: #f5f5f7; }
+        th { text-align: left; padding: 10px 12px; font-size: 11px; color: #6e6e73;
+             text-transform: uppercase; letter-spacing: 0.5px;
+             border-bottom: 1px solid #e0e0e3; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; color: #1d1d1f; }
+        tr:hover { background: #fafafa; }
+        td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+        .empty-state {
+            text-align: center; padding: 24px; color: #6e6e73;
+            font-size: 14px; font-style: italic;
+            background: #fafafa; border-radius: 8px;
+        }
+
+        .pill { display: inline-block; padding: 2px 10px; border-radius: 12px;
+                font-size: 11px; font-weight: 600; }
+        .pill-PAID    { background: #f6ffed; color: #135200; }
+        .pill-UNPAID  { background: #fff7e6; color: #874d00; }
+        .pill-OVERDUE { background: #fff2f0; color: #cf1322; }
+
+        .urgent-row td { color: #cf1322; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Reports</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab active" data-tab="active">Active Members</button>
+        <button class="tab" data-tab="expiring">Expiring Soon</button>
+        <button class="tab" data-tab="bmi">BMI Distribution</button>
+        <button class="tab" data-tab="revenue">Monthly Revenue</button>
+    </div>
+
+    <!-- Tab: Active Members -->
+    <div class="tab-content active" id="tab-active">
+
+        <form method="get" th:action="@{/manager/reports}" class="filter-bar">
+            <select name="tier">
+                <option value="ALL"     th:selected="${tierFilter == ''}">All tiers</option>
+                <option value="CLASSIC" th:selected="${tierFilter == 'CLASSIC'}">CLASSIC</option>
+                <option value="GOLD"    th:selected="${tierFilter == 'GOLD'}">GOLD</option>
+                <option value="VIP"     th:selected="${tierFilter == 'VIP'}">VIP</option>
+            </select>
+            <select name="pkg">
+                <option value="ALL"                th:selected="${packageFilter == ''}">All packages</option>
+                <option value="MONTHLY"            th:selected="${packageFilter == 'MONTHLY'}">MONTHLY</option>
+                <option value="ANNUAL_PREPAID"     th:selected="${packageFilter == 'ANNUAL_PREPAID'}">ANNUAL_PREPAID</option>
+                <option value="ANNUAL_INSTALLMENT" th:selected="${packageFilter == 'ANNUAL_INSTALLMENT'}">ANNUAL_INSTALLMENT</option>
+            </select>
+            <select name="daysRange">
+                <option value="ALL"     th:selected="${daysRangeFilter == ''}">All days left</option>
+                <option value="0_30"    th:selected="${daysRangeFilter == '0_30'}">0–30 days</option>
+                <option value="31_90"   th:selected="${daysRangeFilter == '31_90'}">31–90 days</option>
+                <option value="90_PLUS" th:selected="${daysRangeFilter == '90_PLUS'}">90+ days</option>
+            </select>
+            <button type="submit" class="btn-apply">Apply</button>
+            <a th:href="@{/manager/reports}" class="btn-reset">Reset</a>
+            <span class="row-count"
+                  th:text="${activeRows.size()} + ' / ' + ${totalActive} + ' member(s)'">0 / 0</span>
+        </form>
+
+        <table th:if="${!activeRows.isEmpty()}">
+            <thead>
+            <tr>
+                <th>Full Name</th>
+                <th>Phone</th>
+                <th>Tier</th>
+                <th>Package</th>
+                <th>End Date</th>
+                <th class="num">Days Left</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${activeRows}">
+                <td th:text="${r.fullName}">Name</td>
+                <td th:text="${r.phone}">Phone</td>
+                <td th:text="${r.tier}">GOLD</td>
+                <td th:text="${r.packageType}">MONTHLY</td>
+                <td th:text="${r.endDate}">2026-12-31</td>
+                <td class="num" th:text="${r.daysLeft}">100</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <div class="empty-state" th:if="${activeRows.isEmpty()}">
+            <span th:if="${tierFilter.isEmpty() and packageFilter.isEmpty() and daysRangeFilter.isEmpty()}">
+                No active members.
+            </span>
+            <span th:if="${!tierFilter.isEmpty() or !packageFilter.isEmpty() or !daysRangeFilter.isEmpty()}">
+                No active members match your filters.
+            </span>
+        </div>
+    </div>
+
+    <!-- Tab: Expiring Soon -->
+    <div class="tab-content" id="tab-expiring">
+        <h2>Expiring Soon
+            <span class="count" th:text="'· within ' + ${expiringThreshold} + ' days · ' + ${expiringRows.size()} + ' member(s)'">0</span>
+        </h2>
+        <table th:if="${!expiringRows.isEmpty()}">
+            <thead>
+            <tr>
+                <th>Full Name</th>
+                <th>Phone</th>
+                <th>Tier</th>
+                <th>End Date</th>
+                <th class="num">Days Left</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${expiringRows}" th:classappend="${r.daysLeft <= 7} ? 'urgent-row' : ''">
+                <td th:text="${r.fullName}">Name</td>
+                <td th:text="${r.phone}">Phone</td>
+                <td th:text="${r.tier}">GOLD</td>
+                <td th:text="${r.endDate}">2026-06-15</td>
+                <td class="num" th:text="${r.daysLeft}">5</td>
+            </tr>
+            </tbody>
+        </table>
+        <div class="empty-state" th:if="${expiringRows.isEmpty()}">
+            No memberships expiring within <span th:text="${expiringThreshold}">30</span> days.
+        </div>
+    </div>
+
+    <!-- Tab: BMI Distribution -->
+    <div class="tab-content" id="tab-bmi">
+        <h2>BMI Category Distribution
+            <span class="count" th:text="'· ' + ${bmiRows.size()} + ' member(s) with BMI'">0</span>
+        </h2>
+
+        <!-- Inline SVG bar chart for category counts -->
+        <div th:if="${!bmiRows.isEmpty()}" style="margin-bottom: 20px;">
+            <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" style="width: 100%; max-width: 600px;">
+                <th:block th:with="
+                    maxVal=${maxBmiCount},
+                    barW=100, gap=20, leftPad=40, topPad=10">
+                    <th:block th:each="b, st : ${bmiDist}">
+                        <th:block th:with="
+                            h=${maxVal == 0 ? 0 : (b.count * 140 / maxVal)},
+                            x=${leftPad + st.index * (barW + gap)},
+                            y=${topPad + 140 - h}">
+                            <rect th:x="${x}" th:y="${y}"
+                                  th:width="${barW}" th:height="${h}"
+                                  th:fill="${b.category == 'Underweight' ? '#fa8c16'
+                                          : b.category == 'Normal'      ? '#52c41a'
+                                          : b.category == 'Overweight'  ? '#faad14'
+                                          : b.category == 'Obese'       ? '#cf1322'
+                                          : '#8c8c8c'}"
+                                  rx="4"/>
+                            <text th:x="${x + barW / 2}" th:y="${y - 5}"
+                                  text-anchor="middle" font-size="12" font-weight="600" fill="#1d1d1f"
+                                  th:text="${b.count}">0</text>
+                            <text th:x="${x + barW / 2}" th:y="${topPad + 140 + 18}"
+                                  text-anchor="middle" font-size="11" fill="#6e6e73"
+                                  th:text="${b.category}">Cat</text>
+                        </th:block>
+                    </th:block>
+                </th:block>
+            </svg>
+        </div>
+
+        <h2>Member-Level BMI Data</h2>
+        <table th:if="${!bmiRows.isEmpty()}">
+            <thead>
+            <tr>
+                <th>Full Name</th>
+                <th class="num">BMI</th>
+                <th>Category</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${bmiRows}">
+                <td th:text="${r.fullName}">Name</td>
+                <td class="num" th:text="${#numbers.formatDecimal(r.bmi, 1, 2)}">22.50</td>
+                <td th:text="${r.category}">Normal</td>
+            </tr>
+            </tbody>
+        </table>
+        <div class="empty-state" th:if="${bmiRows.isEmpty()}">
+            No members have recorded BMI yet.
+        </div>
+    </div>
+
+    <!-- Tab: Monthly Revenue -->
+    <div class="tab-content" id="tab-revenue">
+        <h2>Revenue Overview</h2>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Paid Revenue</div>
+                <div class="stat-value money"
+                     th:text="${#numbers.formatDecimal(totalRevenue, 1, 2)} + ' TL'">0.00 TL</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Payments</div>
+                <div class="stat-value" th:text="${paymentRows.size()}">0</div>
+            </div>
+        </div>
+
+        <h2>Monthly Revenue (Last 12 Months)</h2>
+        <div th:if="${!monthlyRevenue.isEmpty()}" style="margin-bottom: 20px;">
+            <svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" style="width: 100%; max-width: 800px;">
+                <th:block th:with="
+                    maxVal=${maxMonthlyTotal},
+                    n=${monthlyRevenue.size()},
+                    barW=50, gap=10, leftPad=30, topPad=20, chartH=160">
+                    <th:block th:each="m, st : ${monthlyRevenue}">
+                        <th:block th:with="
+                            h=${maxVal == 0 ? 0 : (m.total * chartH / maxVal)},
+                            x=${leftPad + st.index * (barW + gap)},
+                            y=${topPad + chartH - h}">
+                            <rect th:x="${x}" th:y="${y}"
+                                  th:width="${barW}" th:height="${h}"
+                                  fill="#0071e3" rx="4"/>
+                            <text th:x="${x + barW / 2}" th:y="${y - 5}"
+                                  text-anchor="middle" font-size="10" font-weight="600" fill="#1d1d1f"
+                                  th:text="${#numbers.formatDecimal(m.total, 1, 0)}">0</text>
+                            <text th:x="${x + barW / 2}" th:y="${topPad + chartH + 18}"
+                                  text-anchor="middle" font-size="10" fill="#6e6e73"
+                                  th:text="${m.month + '/' + (m.year % 100)}">01/26</text>
+                        </th:block>
+                    </th:block>
+                </th:block>
+            </svg>
+        </div>
+
+        <h2>All Payments <span class="count" th:text="'· ' + ${paymentRows.size()} + ' payment(s)'">0</span></h2>
+        <table th:if="${!paymentRows.isEmpty()}">
+            <thead>
+            <tr>
+                <th class="num">Amount</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Status</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="p : ${paymentRows}">
+                <td class="num" th:text="${#numbers.formatDecimal(p.amount, 1, 2)} + ' TL'">0.00 TL</td>
+                <td th:text="${p.date}">2026-05-01</td>
+                <td th:text="${p.type}">CASH</td>
+                <td>
+                    <span class="pill" th:classappend="'pill-' + ${p.status}" th:text="${p.status}">PAID</span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <div class="empty-state" th:if="${paymentRows.isEmpty()}">No payments on file.</div>
+    </div>
+</div>
+
+<script>
+    // Tab switching — vanilla JS, no library.
+    document.querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+</script>
+</body>
+</html>

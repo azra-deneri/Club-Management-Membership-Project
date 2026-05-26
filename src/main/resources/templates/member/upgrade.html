@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — Request Tier Upgrade</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 560px; margin: 60px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 22px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .info-card {
+            background: #f9f9fb; border-radius: 8px;
+            padding: 14px 16px; margin-bottom: 20px; font-size: 13px;
+        }
+        .info-card div { margin: 4px 0; }
+        .info-card strong { color: #1d1d1f; }
+        label.field {
+            display: block; margin-top: 16px; font-weight: 500;
+            color: #1d1d1f; font-size: 14px;
+        }
+        select {
+            width: 100%; padding: 10px; margin-top: 4px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            font-size: 14px; box-sizing: border-box;
+        }
+        .fee-box {
+            margin-top: 20px; padding: 16px;
+            background: #e6f7ff; border: 1px solid #91d5ff;
+            border-radius: 8px; text-align: center;
+        }
+        .fee-label { font-size: 12px; color: #0050b3; }
+        .fee-amount { font-size: 24px; font-weight: 600; color: #0050b3; margin-top: 4px; }
+        .pay-method {
+            margin-top: 20px; padding: 14px; border: 1px solid #e0e0e3;
+            border-radius: 8px;
+        }
+        .pay-method legend {
+            padding: 0 8px; font-weight: 500; font-size: 13px; color: #1d1d1f;
+        }
+        .pay-option {
+            display: block; padding: 8px 0; cursor: pointer;
+        }
+        .pay-option input { margin-right: 8px; }
+        .actions { margin-top: 24px; display: flex; gap: 10px; }
+        button, .btn-link {
+            flex: 1; padding: 12px; border: none; border-radius: 6px;
+            font-size: 15px; cursor: pointer; text-align: center;
+            text-decoration: none; font-weight: 500;
+        }
+        .submit  { background: #d46b08; color: white; }
+        .submit:hover { background: #c66007; }
+        .cancel  { background: #f5f5f7; color: #1d1d1f; }
+        .cancel:hover { background: #ebebef; }
+        .alert {
+            padding: 12px 14px; border-radius: 6px;
+            margin-bottom: 14px; font-size: 13px;
+        }
+        .alert-info { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Request Tier Upgrade</h1>
+        <a th:href="@{/member/membership}" class="top-link">← Back</a>
+    </div>
+
+    <div class="info-card">
+        <div>Current Tier: <strong th:text="${membership.tier}">CLASSIC</strong></div>
+        <div>Package: <strong th:text="${membership.packageType}">MONTHLY</strong> (unchanged after upgrade)</div>
+        <div>Days Remaining: <strong th:text="${daysLeft}">120</strong></div>
+    </div>
+
+    <div class="alert alert-info">
+        The upgrade fee is prorated across your remaining days. Cash payments
+        require manager approval before the tier change applies; online card
+        payments apply immediately on success.
+    </div>
+
+    <form th:action="@{/member/membership/upgrade}" method="post">
+
+        <label class="field" for="newTier">New Tier</label>
+        <select name="newTier" id="newTier" onchange="updateFee()">
+            <option th:each="t : ${targetTiers}"
+                    th:value="${t}"
+                    th:text="${t}">GOLD</option>
+        </select>
+
+        <div class="fee-box">
+            <div class="fee-label">Upgrade Fee</div>
+            <div class="fee-amount" id="feeDisplay">0.00 TL</div>
+        </div>
+
+        <fieldset class="pay-method">
+            <legend>Payment Method</legend>
+            <label class="pay-option">
+                <input type="radio" name="paymentMethod" value="CASH" checked />
+                Cash — pay at the club within 3 days (requires manager approval)
+            </label>
+            <label class="pay-option">
+                <input type="radio" name="paymentMethod" value="ONLINE" />
+                Online (card) — pay now and upgrade immediately
+            </label>
+        </fieldset>
+
+        <div class="actions">
+            <a th:href="@{/member/membership}" class="cancel btn-link">Cancel</a>
+            <button type="submit" class="submit">Continue</button>
+        </div>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    const fees = /*[[${feeByTier}]]*/ {};
+
+    function updateFee() {
+        const sel = document.getElementById('newTier');
+        const tier = sel.value;
+        const amount = fees[tier] != null ? fees[tier] : 0;
+        document.getElementById('feeDisplay').textContent =
+                amount.toFixed(2) + ' TL';
+    }
+
+    updateFee();
+</script>
+</body>
+</html>

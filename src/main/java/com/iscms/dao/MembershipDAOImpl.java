@@ -1,5 +1,6 @@
 package com.iscms.dao;
 
+import com.iscms.model.FreezeLog;
 import com.iscms.model.Membership;
 import com.iscms.util.DBConnection;
 
@@ -195,5 +196,43 @@ public class MembershipDAOImpl implements MembershipDAO {
         // Convert SQL Timestamp → Java LocalDateTime
         ms.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
         return ms;
+    }
+
+    @Override
+    public void insertFreezeLog(int membershipId, java.time.LocalDate start, java.time.LocalDate end) {
+        String sql = "INSERT INTO membership_freeze_log (membership_id, freeze_start, freeze_end) VALUES (?, ?, ?)";
+        try (java.sql.Connection conn = getConn();
+             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, membershipId);
+            ps.setDate(2, java.sql.Date.valueOf(start));
+            ps.setDate(3, java.sql.Date.valueOf(end));
+            ps.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            throw new RuntimeException("insertFreezeLog failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public java.util.Optional<FreezeLog> findLatestFreezeLog(int membershipId) {
+        // Most recent freeze row first, so unfreeze always operates on the
+        // currently-active freeze period rather than an older historical one.
+        String sql = "SELECT freeze_start, freeze_end FROM membership_freeze_log " +
+                     "WHERE membership_id = ? ORDER BY freeze_start DESC, freeze_end DESC LIMIT 1";
+        try (java.sql.Connection conn = getConn();
+             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, membershipId);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return java.util.Optional.of(new FreezeLog(
+                        membershipId,
+                        rs.getDate("freeze_start").toLocalDate(),
+                        rs.getDate("freeze_end").toLocalDate()
+                    ));
+                }
+                return java.util.Optional.empty();
+            }
+        } catch (java.sql.SQLException e) {
+            throw new RuntimeException("findLatestFreezeLog failed: " + e.getMessage(), e);
+        }
     }
 }

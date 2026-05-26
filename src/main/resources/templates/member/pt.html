@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — Personal Training</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 1180px; margin: 40px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 24px; }
+        h1 { margin: 0; color: #1d1d1f; }
+        h2 { color: #1d1d1f; margin: 28px 0 12px; font-size: 18px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .alert {
+            padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+        }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        .alert-info    { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+
+        /* Top bar: trainer dropdown + tier info */
+        .top-bar {
+            display: flex; gap: 16px; align-items: center;
+            padding: 14px 18px; margin-bottom: 14px;
+            background: #f9f9fb; border: 1px solid #e0e0e3;
+            border-radius: 10px; flex-wrap: wrap;
+        }
+        .top-bar label { font-size: 12px; color: #6e6e73; font-weight: 500; }
+        .top-bar select {
+            padding: 8px 12px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            background: white; min-width: 220px;
+        }
+        .tier-badge {
+            margin-left: auto;
+            padding: 6px 14px; background: #e6f7ff; color: #0050b3;
+            border-radius: 6px; font-size: 13px; font-weight: 500;
+        }
+
+        /* Week navigation */
+        .week-nav {
+            display: flex; justify-content: center; align-items: center;
+            gap: 18px; margin: 18px 0 14px;
+        }
+        .week-nav a {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+            border: 1px solid #e0e0e3;
+        }
+        .week-nav a:hover { background: #ebebef; }
+        .week-label {
+            font-size: 15px; font-weight: 600; color: #1d1d1f;
+            min-width: 240px; text-align: center;
+        }
+
+        /* Day rows */
+        .day-row {
+            border-top: 1px solid #f0f0f3;
+            padding: 14px 6px;
+        }
+        .day-row:first-of-type { border-top: none; }
+        .day-header {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 10px;
+        }
+        .day-name {
+            font-size: 14px; font-weight: 600; color: #1d1d1f;
+        }
+        .day-date {
+            font-size: 12px; color: #6e6e73;
+        }
+        .day-today {
+            display: inline-block; margin-left: 6px;
+            padding: 1px 8px; background: #0071e3; color: white;
+            border-radius: 10px; font-size: 10px; font-weight: 600;
+        }
+        .slot-row {
+            display: flex; gap: 10px; flex-wrap: wrap;
+        }
+        .slot-card {
+            min-width: 130px;
+            border: 1px solid #d2d2d7; border-radius: 8px;
+            padding: 10px 12px; background: white;
+            text-align: center;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .slot-card.AVAILABLE { border-color: #b7eb8f; background: #f6ffed; }
+        .slot-card.TAKEN     { border-color: #d9d9d9; background: #fafafa; opacity: 0.7; }
+        .slot-card.MINE      { border-color: #91d5ff; background: #e6f7ff; }
+        .slot-card.PAST      { border-color: #f0f0f3; background: #fafafa; opacity: 0.5; }
+
+        .slot-time { font-weight: 600; font-size: 13px; color: #1d1d1f; }
+        .slot-status {
+            font-size: 11px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .slot-status.AVAILABLE { color: #389e0d; }
+        .slot-status.TAKEN     { color: #6e6e73; }
+        .slot-status.MINE      { color: #0050b3; }
+        .slot-status.PAST      { color: #b0b0b5; }
+
+        .btn-book {
+            padding: 6px 12px; background: #389e0d; color: white;
+            border: none; border-radius: 5px; font-size: 12px;
+            cursor: pointer;
+        }
+        .btn-book:hover { background: #2f8009; }
+        .btn-book:disabled { background: #c0c0c5; cursor: not-allowed; }
+
+        .day-empty {
+            padding: 8px 4px; color: #b0b0b5; font-size: 12px; font-style: italic;
+        }
+
+        /* Filter tabs */
+        .filter-tabs {
+            display: flex; gap: 6px; margin: 12px 0 16px;
+            border-bottom: 1px solid #e0e0e3;
+        }
+        .filter-tab {
+            padding: 8px 16px; text-decoration: none;
+            color: #6e6e73; font-size: 13px; font-weight: 500;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+        .filter-tab:hover { color: #1d1d1f; }
+        .filter-tab.active { color: #0071e3; border-bottom-color: #0071e3; }
+        .filter-count {
+            display: inline-block; margin-left: 6px; padding: 1px 7px;
+            background: #f5f5f7; color: #6e6e73;
+            border-radius: 10px; font-size: 11px;
+        }
+        .filter-tab.active .filter-count { background: #e6f7ff; color: #0071e3; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th {
+            text-align: left; padding: 12px 10px; background: #f9f9fb;
+            border-bottom: 1px solid #e0e0e3; color: #6e6e73; font-weight: 500;
+            text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;
+        }
+        tbody td { padding: 12px 10px; border-bottom: 1px solid #f5f5f7; }
+        tr:hover { background: #fafafa; }
+
+        .pill {
+            display: inline-block; padding: 2px 9px; border-radius: 10px;
+            font-size: 11px; font-weight: 500;
+        }
+        .pill-SCHEDULED { background: #f6ffed; color: #389e0d; }
+        .pill-CANCELLED { background: #f5f5f5; color: #6e6e73; }
+        .pill-COMPLETED { background: #e6f7ff; color: #0050b3; }
+        .pill-NO_SHOW   { background: #fff2f0; color: #cf1322; }
+
+        .btn-cancel {
+            padding: 6px 12px; background: #cf1322; color: white;
+            border: none; border-radius: 5px; font-size: 12px; cursor: pointer;
+        }
+        .btn-cancel:hover { background: #a30d1c; }
+        .empty { text-align: center; padding: 30px 20px; color: #6e6e73; font-size: 13px; }
+
+        .cancel-notice {
+            background: #fff7e6; border: 1px solid #ffd591;
+            border-radius: 10px; padding: 14px 18px;
+            margin: 12px 0 18px; font-size: 13px;
+            display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+        }
+        .cancel-notice .title {
+            font-weight: 600; color: #874d00; margin-bottom: 6px;
+        }
+        .cancel-notice ul { margin: 0; padding-left: 18px; color: #874d00; }
+        .cancel-notice .close-btn {
+            background: transparent; border: none; cursor: pointer;
+            color: #874d00; font-size: 18px; font-weight: 600;
+        }
+
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Personal Training</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+    <div id="cancelNotice" class="cancel-notice"
+         th:if="${!#lists.isEmpty(recentlyCancelled)}">
+        <div>
+            <div class="title">⚠️ Upcoming appointment(s) cancelled</div>
+            <ul>
+                <li th:each="c : ${recentlyCancelled}">
+                    <span th:text="${trainerNames.get(c.trainerId) ?: 'Trainer'}">Trainer</span>
+                    —
+                    <span th:text="${c.appointmentDate}">2026-06-10</span>
+                    <span th:text="${c.startTime} + ' – ' + ${c.endTime}">10:00 – 11:00</span>
+                </li>
+            </ul>
+        </div>
+        <button type="button" class="close-btn" onclick="document.getElementById('cancelNotice').style.display='none';">×</button>
+    </div>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        (function () {
+            var list = /*[[${recentlyCancelled}]]*/ [];
+            if (list && list.length > 0) {
+                var key = 'pt-cancel-alert-' + list.length;
+                if (sessionStorage.getItem(key) !== '1') {
+                    alert('You have ' + list.length + ' cancelled upcoming PT appointment(s). See the notice on this page or the Cancelled tab for details.');
+                    sessionStorage.setItem(key, '1');
+                }
+            }
+        })();
+        /*]]>*/
+    </script>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <div class="alert alert-info" th:unless="${isActive}">
+        Only <strong>ACTIVE</strong> members can book PT sessions. You can
+        still view your appointment history. Your current status is
+        <strong th:text="${memberStatus}">STATUS</strong>.
+    </div>
+
+    <!-- ====================== Top bar: trainer + tier info ====================== -->
+    <form method="get" th:action="@{/member/pt}" id="trainerForm">
+        <div class="top-bar">
+            <label>Trainer:</label>
+            <select name="trainerId" onchange="document.getElementById('trainerForm').submit()">
+                <option th:each="t : ${trainers}"
+                        th:value="${t.trainerId}"
+                        th:text="${t.fullName} + ' — ' + ${t.specialty}"
+                        th:selected="${selectedTrainerId != null and selectedTrainerId == t.trainerId}">
+                </option>
+            </select>
+            <input type="hidden" name="weekStart" th:value="${weekStart}" />
+
+            <span class="tier-badge" th:text="${tierInfo}">TIER — 0 / 0</span>
+        </div>
+    </form>
+
+    <!-- ====================== Week navigation ====================== -->
+    <div class="week-nav">
+        <a th:href="@{/member/pt(trainerId=${selectedTrainerId}, weekStart=${prevWeek})}">◄ Prev Week</a>
+        <div class="week-label">
+            <span th:text="${weekStart}">2026-05-25</span>
+            —
+            <span th:text="${weekEnd}">2026-05-31</span>
+        </div>
+        <a th:href="@{/member/pt(trainerId=${selectedTrainerId}, weekStart=${nextWeek})}">Next Week ►</a>
+    </div>
+
+    <!-- ====================== Week grid (7 day rows) ====================== -->
+    <div th:if="${#lists.isEmpty(weekRows)}" class="empty">
+        Select a trainer to see available slots.
+    </div>
+
+    <div th:each="row : ${weekRows}" class="day-row">
+        <div class="day-header">
+            <span class="day-name" th:text="${row.dayOfWeek}">MONDAY</span>
+            <span class="day-date" th:text="${row.date}">2026-05-25</span>
+            <span class="day-today" th:if="${row.date == today}">TODAY</span>
+        </div>
+
+        <div th:if="${#lists.isEmpty(row.slots)}" class="day-empty">
+            No lesson slots defined for this day.
+        </div>
+
+        <div class="slot-row" th:if="${!#lists.isEmpty(row.slots)}">
+            <div th:each="s : ${row.slots}"
+                 class="slot-card"
+                 th:classappend="${s.status}">
+                <div class="slot-time">
+                    <span th:text="${s.start}">10:00</span> –
+                    <span th:text="${s.end}">11:00</span>
+                </div>
+                <div class="slot-status" th:classappend="${s.status}">
+                    <span th:if="${s.status == 'AVAILABLE'}">✓ AVAILABLE</span>
+                    <span th:if="${s.status == 'TAKEN'}">✗ UNAVAILABLE</span>
+                    <span th:if="${s.status == 'MINE'}">★ YOURS</span>
+                    <span th:if="${s.status == 'PAST'}">— PAST</span>
+                </div>
+
+                <form th:if="${s.status == 'AVAILABLE'}"
+                      method="post" th:action="@{/member/pt/book}"
+                      onsubmit="return confirm('Book this session?');">
+                    <input type="hidden" name="trainerId" th:value="${selectedTrainerId}" />
+                    <input type="hidden" name="date"      th:value="${row.date}" />
+                    <input type="hidden" name="start"     th:value="${s.start}" />
+                    <input type="hidden" name="end"       th:value="${s.end}" />
+                    <input type="hidden" name="weekStart" th:value="${weekStart}" />
+                    <button type="submit" class="btn-book"
+                            th:disabled="${!isActive}"
+                            th:title="${!isActive} ? 'Only ACTIVE members can book' : 'Book this slot'">
+                        Book
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================== My Appointments ====================== -->
+    <h2>My Appointments</h2>
+
+    <div class="filter-tabs">
+        <a th:href="@{/member/pt(trainerId=${selectedTrainerId}, weekStart=${weekStart}, filter='upcoming')}"
+           class="filter-tab"
+           th:classappend="${activeFilter == 'upcoming'} ? ' active' : ''">
+            Upcoming
+            <span class="filter-count" th:text="${countUpcoming}">0</span>
+        </a>
+        <a th:href="@{/member/pt(trainerId=${selectedTrainerId}, weekStart=${weekStart}, filter='past')}"
+           class="filter-tab"
+           th:classappend="${activeFilter == 'past'} ? ' active' : ''">
+            Past
+            <span class="filter-count" th:text="${countPast}">0</span>
+        </a>
+        <a th:href="@{/member/pt(trainerId=${selectedTrainerId}, weekStart=${weekStart}, filter='cancelled')}"
+           class="filter-tab"
+           th:classappend="${activeFilter == 'cancelled'} ? ' active' : ''">
+            Cancelled
+            <span class="filter-count" th:text="${countCancelled}">0</span>
+        </a>
+    </div>
+
+    <div th:if="${#lists.isEmpty(visibleAppts)}" class="empty">
+        <span th:if="${activeFilter == 'upcoming'}">No upcoming appointments.</span>
+        <span th:if="${activeFilter == 'past'}">No past appointments.</span>
+        <span th:if="${activeFilter == 'cancelled'}">No cancelled appointments.</span>
+    </div>
+
+    <table th:if="${!#lists.isEmpty(visibleAppts)}">
+        <thead>
+        <tr>
+            <th>Trainer</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="a : ${visibleAppts}">
+            <td th:text="${trainerNames.get(a.trainerId) ?: '(unknown trainer)'}">Trainer X</td>
+            <td th:text="${a.appointmentDate}">2026-06-10</td>
+            <td>
+                <span th:text="${a.startTime}">10:00</span> –
+                <span th:text="${a.endTime}">11:00</span>
+            </td>
+            <td>
+                    <span class="pill" th:classappend="'pill-' + ${a.status}"
+                          th:text="${a.status}">BOOKED</span>
+            </td>
+            <td>
+                <form th:if="${activeFilter == 'upcoming' and a.status == 'SCHEDULED'}"
+                      th:action="@{'/member/pt/' + ${a.appointmentId} + '/cancel'}"
+                      method="post"
+                      onsubmit="return confirm('Cancel this appointment?');">
+                    <button type="submit" class="btn-cancel">Cancel</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

@@ -26,7 +26,27 @@ public class ManagerService {
     public List<Manager> getAllManagers() {
         return managerDAO.findAll();
     }
+    public String validateManagerForRegistration(String fullName,
+                                                 String username,
+                                                 String email,
+                                                 String password,
+                                                 String role) {
+        if (fullName == null || fullName.isBlank()) return "Full name is required.";
+        if (username == null || username.isBlank()) return "Username is required.";
+        if (email == null || email.isBlank())       return "Email is required.";
+        if (password == null || password.isBlank()) return "Password is required.";
+        if (password.length() < 8)                  return "Password must be at least 8 characters.";
+        if (role == null || (!"MANAGER".equals(role) && !"ADMIN".equals(role)))
+            return "Role must be MANAGER or ADMIN.";
 
+        // Uniqueness — DB lookup for email. Username uniqueness is enforced by the
+        // DB schema (unique constraint); duplicate inserts surface as exceptions
+        // that the controller catches and renders.
+        if (managerDAO.findByEmail(email.trim()).isPresent())
+            return "Email is already in use by another account.";
+
+        return null;
+    }
     // Adds a new manager account
     // Hashes the plain text password before storing — BCrypt with cost factor 12
     // Password is never stored as plain text

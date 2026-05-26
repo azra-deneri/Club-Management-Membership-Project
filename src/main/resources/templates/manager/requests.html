@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — Requests</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 1200px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        h2 {
+            margin: 28px 0 12px; font-size: 16px; color: #1d1d1f;
+            display: flex; align-items: center; gap: 10px;
+        }
+        h2 .count-pill {
+            background: #fff7e6; color: #874d00; padding: 2px 10px;
+            border-radius: 12px; font-size: 12px; font-weight: 600;
+        }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #135200; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+
+        /* Tables */
+        table {
+            width: 100%; border-collapse: collapse; font-size: 13px;
+            margin-bottom: 8px;
+        }
+        thead { background: #f5f5f7; }
+        th {
+            text-align: left; padding: 10px 12px;
+            font-size: 11px; color: #6e6e73;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            border-bottom: 1px solid #e0e0e3;
+        }
+        td {
+            padding: 10px 12px; border-bottom: 1px solid #f0f0f0;
+            color: #1d1d1f;
+        }
+        /* PENDING rows highlighted lightly */
+        tr.pending-row { background: #fffbe6; }
+        tr:hover { background: #fafafa; }
+        tr.pending-row:hover { background: #fff7d6; }
+
+        /* Status pills */
+        .pill {
+            display: inline-block; padding: 2px 10px; border-radius: 12px;
+            font-size: 11px; font-weight: 600;
+        }
+        .pill-PENDING  { background: #fff7e6; color: #874d00; }
+        .pill-APPROVED { background: #f6ffed; color: #135200; }
+        .pill-REJECTED { background: #fff2f0; color: #cf1322; }
+        .pill-EXPIRED  { background: #f5f5f7; color: #6e6e73; }
+
+        .type-pill {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+        }
+        .type-NEW     { background: #e6f7ff; color: #0050b3; }
+        .type-INITIAL { background: #e6f7ff; color: #0050b3; }
+        .type-RENEWAL { background: #fff0f6; color: #9d174d; }
+
+        /* Buttons */
+        .btn {
+            padding: 5px 12px; border-radius: 6px; font-size: 12px;
+            border: none; cursor: pointer; font-weight: 500;
+        }
+        .btn-approve { background: #237804; color: white; }
+        .btn-reject  { background: #cf1322; color: white; }
+        .btn-disabled { background: #f0f0f0; color: #aaa; cursor: not-allowed; }
+
+        /* Filter toolbar */
+        .filter-bar {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+            background: #fafafa; border: 1px solid #ececec; border-radius: 8px;
+            padding: 10px 12px; margin-bottom: 10px;
+        }
+        .filter-bar select {
+            padding: 6px 10px; font-size: 12px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            background: white; cursor: pointer;
+        }
+        .filter-bar select:focus { outline: none; border-color: #0071e3; }
+        .filter-bar .btn-apply {
+            background: #0071e3; color: white; padding: 6px 14px; font-size: 12px;
+        }
+        .filter-bar .btn-reset {
+            background: #f5f5f7; color: #1d1d1f; padding: 6px 14px; font-size: 12px;
+            text-decoration: none; display: inline-block;
+        }
+        .filter-bar .row-count {
+            font-size: 11px; color: #6e6e73; margin-left: auto;
+        }
+        form.inline-form { display: inline; }
+
+        .empty-state {
+            text-align: center; padding: 24px;
+            color: #6e6e73; font-size: 14px; font-style: italic;
+            background: #fafafa; border-radius: 8px; margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Requests</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <!-- ============================================================
+         Registration Requests
+         ============================================================ -->
+    <h2>
+        Registration Requests
+        <span class="count-pill" th:if="${pendingRegs > 0}"
+              th:text="${pendingRegs} + ' pending'">3 pending</span>
+    </h2>
+
+    <!-- Registration filter toolbar. Hidden inputs carry the Tier Upgrade
+         table's filters so a submit here doesn't reset that table. -->
+    <form method="get" th:action="@{/manager/requests}" class="filter-bar">
+        <input type="hidden" name="upStatus"  th:value="${upStatus}"/>
+        <input type="hidden" name="upNewTier" th:value="${upNewTier}"/>
+
+        <select name="regStatus">
+            <option value="ALL"      th:selected="${regStatus == ''}">All statuses</option>
+            <option value="PENDING"  th:selected="${regStatus == 'PENDING'}">Pending</option>
+            <option value="APPROVED" th:selected="${regStatus == 'APPROVED'}">Approved</option>
+            <option value="REJECTED" th:selected="${regStatus == 'REJECTED'}">Rejected</option>
+            <option value="EXPIRED"  th:selected="${regStatus == 'EXPIRED'}">Expired</option>
+        </select>
+
+        <select name="regType">
+            <option value="ALL"     th:selected="${regType == ''}">All types</option>
+            <option value="NEW"     th:selected="${regType == 'NEW'}">New</option>
+            <option value="INITIAL" th:selected="${regType == 'INITIAL'}">Initial</option>
+            <option value="RENEWAL" th:selected="${regType == 'RENEWAL'}">Renewal</option>
+        </select>
+
+        <select name="regTier">
+            <option value="ALL"     th:selected="${regTier == ''}">All tiers</option>
+            <option value="CLASSIC" th:selected="${regTier == 'CLASSIC'}">Classic</option>
+            <option value="GOLD"    th:selected="${regTier == 'GOLD'}">Gold</option>
+            <option value="VIP"     th:selected="${regTier == 'VIP'}">VIP</option>
+        </select>
+
+        <select name="regPackage">
+            <option value="ALL"                th:selected="${regPackage == ''}">All packages</option>
+            <option value="MONTHLY"            th:selected="${regPackage == 'MONTHLY'}">Monthly</option>
+            <option value="ANNUAL_PREPAID"     th:selected="${regPackage == 'ANNUAL_PREPAID'}">Annual prepaid</option>
+            <option value="ANNUAL_INSTALLMENT" th:selected="${regPackage == 'ANNUAL_INSTALLMENT'}">Annual installment</option>
+        </select>
+
+        <button type="submit" class="btn btn-apply">Apply</button>
+        <a th:href="@{/manager/requests(upStatus=${upStatus},upNewTier=${upNewTier})}"
+           class="btn-reset">Reset</a>
+        <span class="row-count" th:text="${registrations.size()} + ' row(s)'">0 rows</span>
+    </form>
+
+    <table th:if="${!registrations.isEmpty()}">
+        <thead>
+        <tr>
+            <th>Member</th>
+            <th>Type</th>
+            <th>Tier</th>
+            <th>Package</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Expires</th>
+            <th style="text-align:right;">Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${registrations}"
+            th:classappend="${r.status == 'PENDING'} ? 'pending-row' : ''">
+            <td th:text="${r.memberName}">Ali Yılmaz</td>
+            <td>
+                <span class="type-pill" th:classappend="'type-' + ${r.type}"
+                      th:text="${r.type}">NEW</span>
+            </td>
+            <td th:text="${r.tier}">GOLD</td>
+            <td th:text="${r.packageType}">ANNUAL_PREPAID</td>
+            <td th:text="${r.amount}">12 750.00 TL</td>
+            <td>
+                <span class="pill" th:classappend="'pill-' + ${r.status}" th:text="${r.status}">PENDING</span>
+            </td>
+            <td th:text="${r.expiresDate}">2026-05-30</td>
+            <td style="text-align:right;">
+                <form th:if="${r.status == 'PENDING'}" class="inline-form" method="post"
+                      th:action="@{|/manager/requests/registration/${r.id}/approve|}"
+                      onsubmit="return confirm('Approve this registration?');">
+                    <button type="submit" class="btn btn-approve">Approve</button>
+                </form>
+                <form th:if="${r.status == 'PENDING'}" class="inline-form" method="post"
+                      th:action="@{|/manager/requests/registration/${r.id}/reject|}"
+                      th:with="msg=${r.type == 'RENEWAL'
+                                    ? 'Reject this renewal request? The member''s current membership stays active.'
+                                    : 'Reject this registration? The member account will be permanently deleted.'}"
+                      th:onsubmit="'return confirm(\'' + ${msg} + '\');'">
+                    <button type="submit" class="btn btn-reject">Reject</button>
+                </form>
+                <span th:if="${r.status != 'PENDING'}" style="color:#6e6e73; font-size:11px;">—</span>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <!-- Empty state directly under the registration table -->
+    <div class="empty-state" th:if="${registrations.isEmpty()}">
+        <span th:if="${regStatus.isEmpty() and regType.isEmpty() and regTier.isEmpty() and regPackage.isEmpty()}">
+            No registration requests on file.
+        </span>
+        <span th:if="${!regStatus.isEmpty() or !regType.isEmpty() or !regTier.isEmpty() or !regPackage.isEmpty()}">
+            No registration requests match your filters.
+        </span>
+    </div>
+
+    <!-- ============================================================
+         Tier Upgrade Requests
+         ============================================================ -->
+    <h2 style="margin-top: 32px;">
+        Tier Upgrade Requests
+        <span class="count-pill" th:if="${pendingUps > 0}"
+              th:text="${pendingUps} + ' pending'">2 pending</span>
+    </h2>
+
+    <!-- Tier upgrade filter toolbar. Hidden inputs carry the Registration
+         table's filters so a submit here doesn't reset that table. -->
+    <form method="get" th:action="@{/manager/requests}" class="filter-bar">
+        <input type="hidden" name="regStatus"  th:value="${regStatus}"/>
+        <input type="hidden" name="regType"    th:value="${regType}"/>
+        <input type="hidden" name="regTier"    th:value="${regTier}"/>
+        <input type="hidden" name="regPackage" th:value="${regPackage}"/>
+
+        <select name="upStatus">
+            <option value="ALL"      th:selected="${upStatus == ''}">All statuses</option>
+            <option value="PENDING"  th:selected="${upStatus == 'PENDING'}">Pending</option>
+            <option value="APPROVED" th:selected="${upStatus == 'APPROVED'}">Approved</option>
+            <option value="REJECTED" th:selected="${upStatus == 'REJECTED'}">Rejected</option>
+            <option value="EXPIRED"  th:selected="${upStatus == 'EXPIRED'}">Expired</option>
+        </select>
+
+        <select name="upNewTier">
+            <option value="ALL"     th:selected="${upNewTier == ''}">All target tiers</option>
+            <option value="GOLD"    th:selected="${upNewTier == 'GOLD'}">→ Gold</option>
+            <option value="VIP"     th:selected="${upNewTier == 'VIP'}">→ VIP</option>
+        </select>
+
+        <button type="submit" class="btn btn-apply">Apply</button>
+        <a th:href="@{/manager/requests(regStatus=${regStatus},regType=${regType},regTier=${regTier},regPackage=${regPackage})}"
+           class="btn-reset">Reset</a>
+        <span class="row-count" th:text="${upgrades.size()} + ' row(s)'">0 rows</span>
+    </form>
+
+    <table th:if="${!upgrades.isEmpty()}">
+        <thead>
+        <tr>
+            <th>Member</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Fee</th>
+            <th>Status</th>
+            <th>Expires</th>
+            <th style="text-align:right;">Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${upgrades}"
+            th:classappend="${r.status == 'PENDING'} ? 'pending-row' : ''">
+            <td th:text="${r.memberName}">Ali Yılmaz</td>
+            <td th:text="${r.oldTier}">CLASSIC</td>
+            <td>
+                <strong th:text="${r.newTier}">GOLD</strong>
+            </td>
+            <td th:text="${r.fee}">450.00 TL</td>
+            <td>
+                <span class="pill" th:classappend="'pill-' + ${r.status}" th:text="${r.status}">PENDING</span>
+            </td>
+            <td th:text="${r.expiresDate}">2026-05-30</td>
+            <td style="text-align:right;">
+                <form th:if="${r.status == 'PENDING'}" class="inline-form" method="post"
+                      th:action="@{|/manager/requests/upgrade/${r.id}/approve|}"
+                      onsubmit="return confirm('Approve this tier upgrade?');">
+                    <button type="submit" class="btn btn-approve">Approve</button>
+                </form>
+                <form th:if="${r.status == 'PENDING'}" class="inline-form" method="post"
+                      th:action="@{|/manager/requests/upgrade/${r.id}/reject|}"
+                      onsubmit="return confirm('Reject this tier upgrade?');">
+                    <button type="submit" class="btn btn-reject">Reject</button>
+                </form>
+                <span th:if="${r.status != 'PENDING'}" style="color:#6e6e73; font-size:11px;">—</span>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <!-- Empty state directly under the tier upgrade table -->
+    <div class="empty-state" th:if="${upgrades.isEmpty()}">
+        <span th:if="${upStatus.isEmpty() and upNewTier.isEmpty()}">
+            No tier upgrade requests on file.
+        </span>
+        <span th:if="${!upStatus.isEmpty() or !upNewTier.isEmpty()}">
+            No tier upgrade requests match your filters.
+        </span>
+    </div>
+</div>
+</body>
+</html>

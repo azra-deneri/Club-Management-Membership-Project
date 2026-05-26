@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — Dashboard</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 800px; margin: 40px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        h1 { margin-top: 0; color: #1d1d1f; }
+        .role-badge {
+            display: inline-block; padding: 4px 12px;
+            background: #0071e3; color: white;
+            border-radius: 12px; font-size: 12px; font-weight: 500;
+            margin-left: 8px;
+        }
+        .frozen-badge {
+            display: inline-block; padding: 4px 12px;
+            background: #1890ff; color: white;
+            border-radius: 12px; font-size: 12px; font-weight: 500;
+            margin-left: 8px;
+        }
+        .passive-badge {
+            display: inline-block; padding: 4px 12px;
+            background: #dc2626; color: white;
+            border-radius: 12px; font-size: 12px; font-weight: 500;
+            margin-left: 8px;
+        }
+        .logout {
+            float: right; padding: 8px 16px;
+            background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px;
+            font-size: 13px;
+        }
+        .links { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 12px; }
+        .links a {
+            padding: 12px 18px; background: #0071e3; color: white;
+            text-decoration: none; border-radius: 6px; font-size: 14px;
+        }
+        .links a:hover { background: #0077ed; }
+        .placeholder {
+            margin-top: 24px; padding: 20px;
+            background: #f9f9fb; border-radius: 8px;
+            color: #6e6e73; font-size: 13px;
+        }
+        .frozen-notice {
+            margin-top: 16px; padding: 14px 16px;
+            background: #e6f7ff; border: 1px solid #91d5ff;
+            color: #0050b3; border-radius: 8px; font-size: 13px;
+        }
+        .passive-notice {
+            margin-top: 16px; padding: 14px 16px;
+            background: #fee2e2; border: 1px solid #fca5a5;
+            color: #991b1b; border-radius: 8px; font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a th:href="@{/logout}" class="logout">Sign Out</a>
+    <h1>
+        Welcome, <span th:text="${displayName}">User</span>
+        <span class="role-badge" th:text="${role}">ROLE</span>
+        <span class="frozen-badge" th:if="${isFrozen}">FROZEN</span>
+        <span class="passive-badge" th:if="${isPaymentDeactivated}">DEACTIVATED</span>
+    </h1>
+
+    <div class="frozen-notice" th:if="${isFrozen}">
+        Your membership is currently frozen. Other features are unavailable
+        until you unfreeze it from the Membership page.
+    </div>
+
+    <!-- PAYMENT_HOLD warning: 3+ overdue installments. Member retains
+         membership but has restricted access until they clear the debt. -->
+    <div class="payment-hold-banner" th:if="${paymentHold}"
+         style="background:#fff2f0; border:2px solid #cf1322; color:#820014;
+                border-radius:10px; padding:16px 20px; margin-bottom:20px;
+                display:flex; align-items:center; justify-content:space-between;
+                gap:16px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:240px;">
+            <div style="font-size:16px; font-weight:700; margin-bottom:4px;">
+                ⚠ Account on Payment Hold
+            </div>
+            <div style="font-size:13px; line-height:1.5;">
+                You have <strong th:text="${overdueCount}">3</strong> overdue
+                installment(s). Most features are restricted until you clear your debt.
+            </div>
+        </div>
+        <a th:href="@{/member/installments}"
+           style="background:#cf1322; color:white; padding:10px 18px;
+                  border-radius:6px; text-decoration:none; font-weight:600;
+                  font-size:14px; white-space:nowrap;">
+            Pay Now →
+        </a>
+    </div>
+
+    <div class="passive-notice" th:if="${isPaymentDeactivated}">
+        <strong>Account deactivated.</strong>
+        Your account is currently deactivated. To reactivate, go to
+        <strong>Installments</strong> and pay your oldest overdue installment.
+    </div>
+
+    <div class="links">
+        <!-- Member links visibility:
+             - FROZEN: only Membership
+             - PAYMENT-DEACTIVATED: only Installments
+             - PAYMENT_HOLD: only Installments (forced via banner)
+             - Normal ACTIVE: all -->
+        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+           th:href="@{/member/profile}">My Profile</a>
+        <a th:if="${role == 'MEMBER' and !isPaymentDeactivated}"
+           th:href="@{/member/membership}">My Membership</a>
+        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+           th:href="@{/member/payments}">Payment History</a>
+        <a th:if="${role == 'MEMBER' and !isFrozen and hasInstallments}"
+           th:href="@{/member/installments}">Installments</a>
+        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+           th:href="@{/member/events}">Events</a>
+        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+           th:href="@{/member/pt}">Personal Training</a>
+        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+           th:href="@{/member/bmi}">BMI Calculator</a>
+
+        <!-- Trainer links -->
+        <a th:if="${role == 'TRAINER'}"
+           th:href="@{/trainer/dashboard}">My Schedule</a>
+        <a th:if="${role == 'TRAINER'}"
+           th:href="@{/trainer/appointments}">My Appointments</a>
+        <a th:if="${role == 'TRAINER'}"
+           th:href="@{/trainer/profile}">My Profile</a>
+
+        <!-- Manager / Admin links -->
+        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+           th:href="@{/manager/members}">Members</a>
+        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+           th:href="@{/manager/add-member}">Add Member</a>
+        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+           th:href="@{/manager/requests}">Requests</a>
+        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+           th:href="@{/manager/events}">Events</a>
+        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+           th:href="@{/manager/trainers}">Trainers &amp; PT</a>
+        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+           th:href="@{/manager/reports}">Reports</a>
+        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+           th:href="@{/manager/profile}">My Profile</a>
+    </div>
+
+    <div class="placeholder" th:if="${!isFrozen and !isPaymentDeactivated}">
+        Additional dashboard panels will appear here as features are migrated from the desktop version.
+    </div>
+</div>
+</body>
+</html>

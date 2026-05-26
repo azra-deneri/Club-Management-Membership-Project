@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — My Membership</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 760px; margin: 40px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 24px; }
+        h1 { margin: 0; color: #1d1d1f; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .card {
+            border: 1px solid #e0e0e3; border-radius: 8px;
+            padding: 20px; margin-bottom: 20px;
+        }
+        .card h2 {
+            margin: 0 0 16px 0; font-size: 16px; color: #1d1d1f;
+            padding-bottom: 8px; border-bottom: 1px solid #e0e0e3;
+        }
+        .info-row {
+            display: grid; grid-template-columns: 200px 1fr;
+            padding: 8px 0; border-bottom: 1px solid #f5f5f7;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #6e6e73; font-size: 13px; }
+        .info-value { font-weight: 500; color: #1d1d1f; }
+        .status-pill {
+            display: inline-block; padding: 3px 10px; border-radius: 12px;
+            font-size: 12px; font-weight: 500;
+        }
+        .status-ACTIVE        { background: #f6ffed; color: #389e0d; }
+        .status-FROZEN        { background: #e6f7ff; color: #1890ff; }
+        .status-PASSIVE       { background: #f5f5f7; color: #6e6e73; }
+        .status-PAYMENT_HOLD  { background: #fff7e6; color: #d46b08; }
+        .alert {
+            padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+        }
+        .alert-warn    { background: #fffbe6; border: 1px solid #ffe58f; color: #ad6800; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
+        .alert-info    { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+        .actions {
+            margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px;
+        }
+        .btn, .btn-form button {
+            padding: 10px 18px; border: none; border-radius: 6px;
+            font-size: 14px; cursor: pointer; text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary   { background: #0071e3; color: white; }
+        .btn-primary:hover { background: #0077ed; }
+        .btn-success   { background: #389e0d; color: white; }
+        .btn-warning   { background: #d46b08; color: white; }
+        .btn-warning:hover { background: #c66007; }
+        .btn-info      { background: #1890ff; color: white; }
+        .btn-disabled  { background: #c7c7cc; color: #6e6e73; cursor: not-allowed;
+                         pointer-events: none; }
+        .btn-form { display: inline; margin: 0; }
+        .empty {
+            text-align: center; padding: 60px 20px; color: #6e6e73;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>My Membership</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <div class="alert alert-warn" th:if="${onPaymentHold}">
+        Your account is on <strong>Payment Hold</strong>. Tier upgrades and
+        membership freezing are unavailable until your overdue installments are paid.
+    </div>
+
+    <div class="alert alert-info" th:if="${canUnfreeze}">
+        Your membership is currently <strong>frozen</strong>. While frozen, the
+        only action available to you is unfreezing from this page — other
+        member features are disabled. Unfreezing early only adds the days
+        you actually spent frozen to your end date.
+    </div>
+    <div class="alert alert-warn" th:if="${cancellationPending}"
+         style="background:#fff7e6; border:1px solid #ffd591; color:#874d00; padding:12px 14px; border-radius:6px; margin-bottom:16px; font-size:13px;">
+        You have <strong>requested cancellation</strong> of your membership.
+        Your access will continue until <strong th:text="${membership.endDate}">end date</strong>,
+        after which your account will be moved to PASSIVE. You can withdraw this request anytime before then.
+        <form th:action="@{/member/membership/cancel/undo}" method="post" style="display:inline; margin-left:8px;">
+            <button type="submit" class="btn btn-link"
+                    style="background:none; border:none; color:#0050b3; text-decoration:underline; cursor:pointer; padding:0; font-size:13px;">
+                Withdraw cancellation
+            </button>
+        </form>
+    </div>
+
+    <div class="card" th:if="${membership}">
+        <h2>Current Membership</h2>
+
+        <div class="info-row">
+            <span class="info-label">Tier</span>
+            <span class="info-value" th:text="${membership.tier}">CLASSIC</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Package</span>
+            <span class="info-value" th:text="${membership.packageType}">MONTHLY</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Start Date</span>
+            <span class="info-value" th:text="${membership.startDate}">2026-01-01</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">End Date</span>
+            <span class="info-value" th:text="${membership.endDate}">2026-12-31</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Days Remaining</span>
+            <span class="info-value" th:if="${membership.status == 'ACTIVE' or membership.status == 'FROZEN'}"
+                  th:text="${daysLeft + ' days'}">120 days</span>
+            <span class="info-value" th:if="${membership.status == 'PASSIVE'}"
+                  style="color:#6e6e73; font-style:italic;">Expired</span>
+            <span class="info-value" th:if="${membership.status != 'ACTIVE' and membership.status != 'FROZEN' and membership.status != 'PASSIVE'}"
+                  th:text="${daysLeft + ' days'}">120 days</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Status</span>
+            <span>
+                <span class="status-pill"
+                      th:classappend="'status-' + ${membership.status}"
+                      th:text="${membership.status}">ACTIVE</span>
+            </span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Freeze Used</span>
+            <span class="info-value" th:text="${membership.freezeCount + 'x'}">0x</span>
+        </div>
+
+        <div class="actions">
+            <!-- Tier Upgrade — now a real link to the upgrade form -->
+            <a th:if="${canUpgrade}"
+               th:href="@{/member/membership/upgrade}"
+               class="btn btn-warning">Request Tier Upgrade</a>
+            <span th:if="${!canUpgrade}" class="btn btn-disabled"
+                  th:title="${membership.tier == 'VIP'} ? 'You are already on the highest tier.' :
+                            (${onPaymentHold} ? 'Tier upgrades are unavailable while on Payment Hold.' : '')">
+                Request Tier Upgrade
+            </span>
+
+            <!-- Freeze -->
+            <a th:if="${canFreeze}"
+               th:href="@{/member/membership/freeze}"
+               class="btn btn-primary">Freeze Membership</a>
+
+            <!-- Unfreeze (POST form) -->
+            <form th:if="${canUnfreeze}"
+                  th:action="@{/member/membership/unfreeze}"
+                  method="post" class="btn-form">
+                <button type="submit" class="btn btn-info">Unfreeze Membership</button>
+            </form>
+
+            <!-- Renew — only shown when membership has expired (PASSIVE) -->
+            <a th:if="${showRenew}"
+               th:href="@{/member/membership/renew}"
+               class="btn btn-success">Renew Membership</a>
+
+            <!-- Cancel Membership — 3-step confirmation -->
+            <form th:if="${canCancel}"
+                  th:action="@{/member/membership/cancel}"
+                  method="post" class="btn-form"
+                  onsubmit="return confirmCancel(this);">
+                <button type="submit" class="btn btn-danger"
+                        style="background:#cf1322; color:white; border:none;">
+                    Cancel Membership
+                </button>
+            </form>
+        </div>
+
+        <script th:inline="javascript">
+            // 3-step confirmation. Each step must be confirmed individually.
+            function confirmCancel(form) {
+                var endDate = /*[[${membership?.endDate}]]*/ '';
+                if (!confirm('Step 1 of 3:\n\nAre you sure you want to cancel your membership?')) return false;
+                if (!confirm('Step 2 of 3:\n\nYour access will continue until ' + endDate +
+                             '. After that, your account becomes PASSIVE.\n\nDo you want to proceed?')) return false;
+                if (!confirm('Step 3 of 3:\n\nThis is your final confirmation.\n\nClick OK to submit the cancellation request.')) return false;
+                return true;
+            }
+        </script>
+    </div>
+
+    <div class="card empty" th:if="${empty}">
+        <p>No membership found on record.</p>
+        <p>Contact a manager to set up a new membership.</p>
+    </div>
+</div>
+</body>
+</html>

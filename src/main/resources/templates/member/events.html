@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — Events</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 1100px; margin: 40px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 24px; }
+        h1 { margin: 0; color: #1d1d1f; }
+        h2 { color: #1d1d1f; margin: 28px 0 12px; font-size: 18px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .alert {
+            padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+        }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        .alert-info    { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+
+        /* Filter tabs */
+        .filter-tabs {
+            display: flex; gap: 6px; margin: 12px 0 16px;
+            border-bottom: 1px solid #e0e0e3;
+        }
+        .filter-tab {
+            padding: 8px 16px; text-decoration: none;
+            color: #6e6e73; font-size: 13px; font-weight: 500;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+        .filter-tab:hover { color: #1d1d1f; }
+        .filter-tab.active {
+            color: #0071e3; border-bottom-color: #0071e3;
+        }
+        .filter-count {
+            display: inline-block; margin-left: 6px; padding: 1px 7px;
+            background: #f5f5f7; color: #6e6e73;
+            border-radius: 10px; font-size: 11px;
+        }
+        .filter-tab.active .filter-count { background: #e6f7ff; color: #0071e3; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th {
+            text-align: left; padding: 12px 10px; background: #f9f9fb;
+            border-bottom: 1px solid #e0e0e3; color: #6e6e73; font-weight: 500;
+            text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;
+        }
+        tbody td { padding: 12px 10px; border-bottom: 1px solid #f5f5f7; }
+        tr:hover { background: #fafafa; }
+
+        .pill {
+            display: inline-block; padding: 2px 9px; border-radius: 10px;
+            font-size: 11px; font-weight: 500;
+        }
+        .pill-cat       { background: #e6f7ff; color: #0050b3; }
+        .pill-cap-ok    { background: #f6ffed; color: #389e0d; }
+        .pill-cap-low   { background: #fffbe6; color: #ad6800; }
+        .pill-cap-full  { background: #fff2f0; color: #cf1322; }
+        .pill-status-REGISTERED { background: #f6ffed; color: #389e0d; }
+        .pill-status-CANCELLED  { background: #f5f5f5; color: #6e6e73; }
+        .pill-status-ATTENDED   { background: #e6f7ff; color: #0050b3; }
+
+        .btn-register {
+            display: inline-block; padding: 6px 12px;
+            background: #0071e3; color: white;
+            border: none; border-radius: 5px; font-size: 12px;
+            cursor: pointer;
+        }
+        .btn-register:hover { background: #0077ed; }
+        .btn-register:disabled { background: #c0c0c5; cursor: not-allowed; }
+        .btn-cancel {
+            display: inline-block; padding: 6px 12px;
+            background: #cf1322; color: white;
+            border: none; border-radius: 5px; font-size: 12px;
+            cursor: pointer;
+        }
+        .btn-cancel:hover { background: #a30d1c; }
+        .registered-badge {
+            display: inline-block; padding: 4px 10px;
+            background: #f6ffed; color: #389e0d;
+            border-radius: 4px; font-size: 11px; font-weight: 500;
+        }
+        .empty { text-align: center; padding: 30px 20px; color: #6e6e73; font-size: 13px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Events</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <div class="alert alert-info" th:unless="${isActive}">
+        Only <strong>ACTIVE</strong> members can register for events. You can
+        still browse upcoming events below. Your current status is
+        <strong th:text="${memberStatus}">STATUS</strong>.
+    </div>
+
+    <!-- ====================== Upcoming Events ====================== -->
+    <h2>Upcoming Events</h2>
+
+    <div th:if="${#lists.isEmpty(upcoming)}" class="empty">
+        No upcoming events at the moment.
+    </div>
+
+    <table th:if="${!#lists.isEmpty(upcoming)}">
+        <thead>
+        <tr>
+            <th>Event</th>
+            <th>Category</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Location</th>
+            <th>Capacity</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="e : ${upcoming}">
+            <td th:text="${e.eventName}">Yoga</td>
+            <td><span class="pill pill-cat" th:text="${e.category}">FITNESS</span></td>
+            <td th:text="${e.eventDate}">2026-06-10</td>
+            <td>
+                <span th:text="${e.startTime}">10:00</span> –
+                <span th:text="${e.endTime}">11:00</span>
+            </td>
+            <td th:text="${e.location}">Main Studio</td>
+            <td th:with="reg=${registeredCounts.get(e.eventId)}, cap=${e.capacity}">
+                    <span class="pill"
+                          th:classappend="${reg >= cap} ? 'pill-cap-full' : (${reg + 3 >= cap} ? 'pill-cap-low' : 'pill-cap-ok')"
+                          th:text="${reg} + ' / ' + ${cap}">0 / 0</span>
+            </td>
+            <td>
+                    <span th:if="${registeredEventIds.contains(e.eventId)}" class="registered-badge">
+                        ✓ Registered
+                    </span>
+                <form th:unless="${registeredEventIds.contains(e.eventId)}"
+                      th:action="@{'/member/events/' + ${e.eventId} + '/register'}"
+                      method="post" style="display:inline;">
+                    <button type="submit" class="btn-register"
+                            th:disabled="${!isActive}"
+                            th:title="${!isActive} ? 'Only ACTIVE members can register' : 'Register for this event'">
+                        Register
+                    </button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <!-- ====================== My Registrations ====================== -->
+    <h2>My Registrations</h2>
+
+    <!-- Filter tabs: Upcoming / Past / Cancelled -->
+    <div class="filter-tabs">
+        <a th:href="@{/member/events(filter='upcoming')}"
+           class="filter-tab"
+           th:classappend="${activeFilter == 'upcoming'} ? ' active' : ''">
+            Upcoming
+            <span class="filter-count" th:text="${countUpcomingRegs}">0</span>
+        </a>
+        <a th:href="@{/member/events(filter='past')}"
+           class="filter-tab"
+           th:classappend="${activeFilter == 'past'} ? ' active' : ''">
+            Past
+            <span class="filter-count" th:text="${countPastRegs}">0</span>
+        </a>
+        <a th:href="@{/member/events(filter='cancelled')}"
+           class="filter-tab"
+           th:classappend="${activeFilter == 'cancelled'} ? ' active' : ''">
+            Cancelled
+            <span class="filter-count" th:text="${countCancelledRegs}">0</span>
+        </a>
+    </div>
+
+    <div th:if="${#lists.isEmpty(visibleRegs)}" class="empty">
+        <span th:if="${activeFilter == 'upcoming'}">No upcoming registrations.</span>
+        <span th:if="${activeFilter == 'past'}">No past registrations.</span>
+        <span th:if="${activeFilter == 'cancelled'}">No cancelled registrations.</span>
+    </div>
+
+    <table th:if="${!#lists.isEmpty(visibleRegs)}">
+        <thead>
+        <tr>
+            <th>Event</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Registered On</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${visibleRegs}" th:with="ev=${eventLookup.get(r.eventId)}">
+            <td th:text="${ev != null ? ev.eventName : '(deleted event)'}">Yoga</td>
+            <td th:text="${ev != null ? ev.eventDate : '—'}">2026-06-10</td>
+            <td>
+                <span th:text="${ev != null ? ev.startTime : '—'}">10:00</span>
+                <span th:if="${ev != null}"> – </span>
+                <span th:text="${ev != null ? ev.endTime : ''}">11:00</span>
+            </td>
+            <td th:text="${r.registrationDate != null ? r.registrationDate.toLocalDate() : '—'}">2026-05-20</td>
+            <td>
+                    <span class="pill" th:classappend="'pill-status-' + ${r.status}"
+                          th:text="${r.status}">REGISTERED</span>
+            </td>
+            <td>
+                <!-- Cancel only visible in Upcoming tab + REGISTERED + event exists -->
+                <form th:if="${activeFilter == 'upcoming' and r.status == 'REGISTERED' and ev != null}"
+                      th:action="@{'/member/events/' + ${r.eventId} + '/cancel'}"
+                      method="post" style="display:inline;"
+                      onsubmit="return confirm('Cancel registration for this event?');">
+                    <button type="submit" class="btn-cancel">Cancel</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

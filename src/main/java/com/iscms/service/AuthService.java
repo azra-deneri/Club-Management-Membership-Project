@@ -148,6 +148,30 @@ public class AuthService {
         return LoginResult.success(refreshed);
     }
 
+    // Web-only variant of loginMember that also lets a FROZEN member sign in.
+    // Phase 1 (Swing) treated FROZEN as a terminal login state, which had a
+    // side effect: members who froze themselves were stuck out of the system
+    // because no UI ever called unfreezeMembership. Phase 2 closes that gap
+    // by letting frozen members log in, but the MemberController limits them
+    // to only the Membership page (where they can self-unfreeze).
+    //
+    // We do a manual password verification here because the regular loginMember
+    // short-circuits on FROZEN before reaching the BCrypt check.
+    public LoginResult loginMemberAllowingFrozen(String phone, String password) {
+        LoginResult normal = loginMember(phone, password);
+        if (normal.getStatus() != LoginResult.Status.FROZEN) return normal;
+
+        Optional<Member> opt = memberDAO.findByPhone(phone);
+        if (opt.isEmpty()) return LoginResult.NOT_FOUND;
+        Member m = opt.get();
+        if (!BCrypt.checkpw(password, m.getPassword())) {
+            return LoginResult.wrong(0);
+        }
+        return LoginResult.success(m);
+    }
+
+
+
     // Authenticates a manager using email and password.
     // ADMIN accounts are exempt from lockout — see Batch 1 fix.
     public LoginResult loginManager(String email, String password) {
@@ -220,6 +244,70 @@ public class AuthService {
         managerDAO.updatePassword(manager.getManagerId(), hashed);
         managerDAO.updateLockStatus(manager.getManagerId(), false);
         managerDAO.updateFailedAttempts(manager.getManagerId(), 0);
+        return ResetResult.SUCCESS;
+    }
+
+    // Manager/Admin self-service password change (from My Profile).
+    // Verifies current password, ensures new differs, then hashes & persists.
+    // Caller passes the live Manager object (from session) so we can also
+    // refresh its in-memory password hash to keep the session consistent.
+    public ResetResult changeManagerPasswordSelf(Manager manager,
+                                                 String currentPlainPw,
+                                                 String newPlainPw) {
+        if (manager == null) return ResetResult.NOT_FOUND;
+        if (currentPlainPw == null || currentPlainPw.isBlank())
+            throw new IllegalArgumentException("Current password is required.");
+        if (newPlainPw == null || newPlainPw.length() < 8)
+            throw new IllegalArgumentException("New password must be at least 8 characters.");
+
+        // Verify current password against the stored hash.
+        if (!BCrypt.checkpw(currentPlainPw, manager.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect.");
+        }
+        // Reject same-as-old before hashing.
+        if (BCrypt.checkpw(newPlainPw, manager.getPassword())) {
+            return ResetResult.SAME_AS_OLD;
+        }
+
+        String newHash = BCrypt.hashpw(newPlainPw, BCrypt.gensalt());
+        managerDAO.updatePassword(manager.getManagerId(), newHash);
+
+        // Keep the in-memory Manager (held in the HTTP session) in sync so
+        // subsequent changes within the same session validate correctly.
+        manager.setPassword(newHash);
+
+        return ResetResult.SUCCESS;
+    }
+
+    // Trainer self-service password change (from My Profile, web only).
+    // Mirrors changeManagerPasswordSelf — all business rules enforced here:
+    //   - current password must be correct
+    //   - new password must be at least 6 chars (trainer policy)
+    //   - new password must differ from the current one
+    // Returns ResetResult so the controller can render a friendly message.
+    public ResetResult changeTrainerPasswordSelf(Trainer trainer,
+                                                 String currentPlainPw,
+                                                 String newPlainPw) {
+        if (trainer == null) return ResetResult.NOT_FOUND;
+        if (currentPlainPw == null || currentPlainPw.isBlank())
+            throw new IllegalArgumentException("Current password is required.");
+        if (newPlainPw == null || newPlainPw.length() < 6)
+            throw new IllegalArgumentException("New password must be at least 6 characters.");
+
+        // Verify current password against stored BCrypt hash
+        if (!BCrypt.checkpw(currentPlainPw, trainer.getPassword()))
+            throw new IllegalArgumentException("Current password is incorrect.");
+
+        // Reject same-as-old
+        if (BCrypt.checkpw(newPlainPw, trainer.getPassword()))
+            return ResetResult.SAME_AS_OLD;
+
+        // Hash + persist
+        String hashed = BCrypt.hashpw(newPlainPw, BCrypt.gensalt(12));
+        trainerDAO.updatePassword(trainer.getTrainerId(), hashed);
+
+        // Keep in-memory trainer object in sync with DB
+        trainer.setPassword(hashed);
         return ResetResult.SUCCESS;
     }
 

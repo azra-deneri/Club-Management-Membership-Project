@@ -1,5 +1,6 @@
 package com.iscms.dao;
 
+import com.iscms.model.FreezeLog;
 import com.iscms.model.Membership;
 import java.util.List;
 import java.util.Optional;
@@ -45,4 +46,10 @@ public interface MembershipDAO {
     // Update the package type of a membership
     // Called when package changes during renewal or upgrade approval
     void updatePackageType(int membershipId, String packageType);
+
+    // Phase 2 — freeze audit log support (see membership_freeze_log table).
+    // Project 1 ships the schema but never reads/writes it; Phase 2 starts
+    // using it so members can self-unfreeze early without a full-period refund.
+    void insertFreezeLog(int membershipId, java.time.LocalDate start, java.time.LocalDate end);
+    java.util.Optional<FreezeLog> findLatestFreezeLog(int membershipId);
 }

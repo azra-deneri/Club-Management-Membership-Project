@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="'ISC-MS — ' + ${pageTitle}">ISC-MS — Online Payment</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 480px; margin: 60px auto; padding: 32px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 20px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .summary {
+            background: #f9f9fb; border-radius: 8px; padding: 16px;
+            margin-bottom: 20px;
+        }
+        .summary .purpose { font-size: 13px; color: #6e6e73; }
+        .summary .amount {
+            font-size: 28px; font-weight: 600; color: #21548d;
+            margin-top: 4px;
+        }
+        .alert {
+            padding: 12px 14px; border-radius: 6px;
+            margin-bottom: 16px; font-size: 13px;
+        }
+        .alert-error { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        label.field {
+            display: block; margin-top: 16px; font-weight: 500;
+            color: #1d1d1f; font-size: 14px;
+        }
+        input[type=text], input[type=password] {
+            width: 100%; padding: 10px; margin-top: 4px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            font-size: 14px; box-sizing: border-box;
+        }
+        .row { display: flex; gap: 12px; }
+        .row > div { flex: 1; }
+        .test-cards {
+            margin-top: 20px; padding: 12px 14px;
+            background: #fffbe6; border: 1px solid #ffe58f;
+            border-radius: 6px; font-size: 12px; color: #6e4e00;
+        }
+        .test-cards h4 { margin: 0 0 6px 0; font-size: 12px; }
+        .test-cards code {
+            font-family: ui-monospace, monospace;
+            background: white; padding: 1px 5px; border-radius: 3px;
+        }
+        .actions { margin-top: 24px; display: flex; gap: 10px; }
+        button, .btn-link {
+            flex: 1; padding: 12px; border: none; border-radius: 6px;
+            font-size: 15px; cursor: pointer; text-align: center;
+            text-decoration: none; font-weight: 500;
+        }
+        .pay     { background: #21548d; color: white; }
+        .pay:hover { background: #1a4574; }
+        .cancel  { background: #f5f5f7; color: #1d1d1f; }
+        .cancel:hover { background: #ebebef; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>💳 <span th:text="${pageTitle}">Online Payment</span></h1>
+        <a th:href="@{${backUrl}}" class="top-link">← Back</a>
+    </div>
+
+    <div class="summary">
+        <div class="purpose" th:text="${purposeLine}">Tier Upgrade: CLASSIC → GOLD</div>
+        <div class="amount" th:text="${#numbers.formatDecimal(amount, 1, 2) + ' TL'}">0.00 TL</div>
+    </div>
+
+    <div class="alert alert-error" th:if="${error}" th:text="${error}"></div>
+
+    <form th:action="@{${formAction}}" method="post">
+
+        <!-- Caller-supplied hidden fields (e.g. newTier for upgrade flow).
+             Installment flow uses none — the installmentId is in the URL. -->
+        <input th:each="entry : ${hiddenFields}"
+               type="hidden"
+               th:name="${entry.key}"
+               th:value="${entry.value}" />
+
+        <label class="field" for="cardNumber">Card Number</label>
+        <input type="text" name="cardNumber" id="cardNumber"
+               maxlength="19" placeholder="4242 4242 4242 4242"
+               autocomplete="cc-number" required />
+
+        <label class="field" for="cardName">Name on Card</label>
+        <input type="text" name="cardName" id="cardName"
+               placeholder="Fatma Aslan" autocomplete="cc-name" required />
+
+        <div class="row">
+            <div>
+                <label class="field">Expiry</label>
+                <div style="display:flex; gap:8px; margin-top:4px;">
+                    <select id="expMonth" required
+                            style="flex:1; padding:10px; border:1px solid #d2d2d7;
+                                   border-radius:6px; font-size:14px; background:white;">
+                        <option value="">MM</option>
+                        <option value="01">01 — Jan</option>
+                        <option value="02">02 — Feb</option>
+                        <option value="03">03 — Mar</option>
+                        <option value="04">04 — Apr</option>
+                        <option value="05">05 — May</option>
+                        <option value="06">06 — Jun</option>
+                        <option value="07">07 — Jul</option>
+                        <option value="08">08 — Aug</option>
+                        <option value="09">09 — Sep</option>
+                        <option value="10">10 — Oct</option>
+                        <option value="11">11 — Nov</option>
+                        <option value="12">12 — Dec</option>
+                    </select>
+                    <select id="expYear" required
+                            style="flex:1; padding:10px; border:1px solid #d2d2d7;
+                                   border-radius:6px; font-size:14px; background:white;">
+                        <option value="">YY</option>
+                        <option value="26">2026</option>
+                        <option value="27">2027</option>
+                        <option value="28">2028</option>
+                        <option value="29">2029</option>
+                        <option value="30">2030</option>
+                        <option value="31">2031</option>
+                        <option value="32">2032</option>
+                        <option value="33">2033</option>
+                        <option value="34">2034</option>
+                        <option value="35">2035</option>
+                    </select>
+                </div>
+                <!-- Backend still receives single 'expiry' field in MM/YY format -->
+                <input type="hidden" name="expiry" id="expiry" />
+            </div>
+            <div>
+                <label class="field" for="cvv">CVV</label>
+                <input type="password" name="cvv" id="cvv"
+                       maxlength="3" pattern="\d{3}"
+                       autocomplete="cc-csc" required />
+            </div>
+        </div>
+
+        <div class="test-cards">
+            <h4>Demo test cards</h4>
+            <div><code th:text="${cardSuccess}">4242…4242</code> → success</div>
+            <div><code th:text="${cardInsufficient}">4000…0002</code> → insufficient funds</div>
+            <div><code th:text="${cardExpired}">4000…0069</code> → expired card</div>
+            <div><code th:text="${cardBadCvv}">4000…0127</code> → invalid CVV</div>
+        </div>
+
+        <div class="actions">
+            <a th:href="@{${backUrl}}" class="cancel btn-link">Cancel</a>
+            <button type="submit" class="pay">Pay Now</button>
+        </div>
+
+        <script>
+            // Combine MM + YY dropdowns into the single 'expiry' hidden field
+            // so the backend (which expects "MM/YY" format) keeps working unchanged.
+            (function() {
+                const form     = document.querySelector('form');
+                const monthSel = document.getElementById('expMonth');
+                const yearSel  = document.getElementById('expYear');
+                const expiry   = document.getElementById('expiry');
+
+                function sync() {
+                    if (monthSel.value && yearSel.value) {
+                        expiry.value = monthSel.value + '/' + yearSel.value;
+                    } else {
+                        expiry.value = '';
+                    }
+                }
+                monthSel.addEventListener('change', sync);
+                yearSel.addEventListener('change', sync);
+                form.addEventListener('submit', sync);
+            })();
+        </script>
+
+    </form>
+</div>
+</body>
+</html>

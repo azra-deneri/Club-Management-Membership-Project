@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISC-MS — Trainers</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 1200px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        .header-actions { display: flex; gap: 8px; }
+        .top-link, .btn-primary {
+            padding: 8px 16px; border-radius: 6px; font-size: 13px;
+            text-decoration: none; border: none; cursor: pointer; font-weight: 500;
+        }
+        .top-link    { background: #f5f5f7; color: #1d1d1f; }
+        .btn-primary { background: #0071e3; color: white; }
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #135200; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+
+        .filter-bar {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+            background: #fafafa; border: 1px solid #ececec; border-radius: 8px;
+            padding: 10px 12px; margin-bottom: 12px;
+        }
+        .filter-bar select {
+            padding: 6px 10px; font-size: 12px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            background: white; cursor: pointer;
+        }
+        .filter-bar .btn-apply  { background: #0071e3; color: white; padding: 6px 14px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; }
+        .filter-bar .btn-reset  { background: #f5f5f7; color: #1d1d1f; padding: 6px 14px; font-size: 12px; border-radius: 6px; text-decoration: none; }
+        .filter-bar .row-count  { font-size: 11px; color: #6e6e73; margin-left: auto; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead { background: #f5f5f7; }
+        th { text-align: left; padding: 10px 12px; font-size: 11px; color: #6e6e73;
+             text-transform: uppercase; letter-spacing: 0.5px;
+             border-bottom: 1px solid #e0e0e3; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; color: #1d1d1f; }
+        tr:hover { background: #fafafa; }
+
+        .pill { display: inline-block; padding: 2px 10px; border-radius: 12px;
+                font-size: 11px; font-weight: 600; }
+        .pill-ACTIVE   { background: #f6ffed; color: #135200; }
+        .pill-INACTIVE { background: #f5f5f7; color: #6e6e73; }
+        .pill-LOCKED   { background: #fff2f0; color: #cf1322; margin-left: 4px; }
+
+        .btn-sm {
+            padding: 4px 10px; font-size: 11px; border-radius: 4px;
+            border: none; cursor: pointer; font-weight: 500; text-decoration: none;
+            display: inline-block; margin-right: 4px;
+        }
+        .btn-edit       { background: #0071e3; color: white; }
+        .btn-toggle     { background: #fa8c16; color: white; }
+        .btn-unlock     { background: #722ed1; color: white; }
+        .btn-schedule   { background: #237804; color: white; }
+        form.inline-form { display: inline; }
+        .empty-state {
+            text-align: center; padding: 24px; color: #6e6e73;
+            font-size: 14px; font-style: italic;
+            background: #fafafa; border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Trainers</h1>
+        <div class="header-actions">
+            <a th:href="@{/manager/trainers/new}" class="btn-primary">+ New Trainer</a>
+            <a th:href="@{/manager/appointments}" class="top-link">Appointments →</a>
+            <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+        </div>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <form method="get" th:action="@{/manager/trainers}" class="filter-bar">
+        <select name="status">
+            <option value="ALL"      th:selected="${statusFilter == ''}">All statuses</option>
+            <option value="ACTIVE"   th:selected="${statusFilter == 'ACTIVE'}">Active</option>
+            <option value="INACTIVE" th:selected="${statusFilter == 'INACTIVE'}">Inactive</option>
+        </select>
+        <select name="specialty">
+            <option value="ALL"      th:selected="${specialtyFilter == ''}">All specialties</option>
+            <option value="FITNESS"  th:selected="${specialtyFilter == 'FITNESS'}">Fitness</option>
+            <option value="YOGA"     th:selected="${specialtyFilter == 'YOGA'}">Yoga</option>
+            <option value="SWIMMING" th:selected="${specialtyFilter == 'SWIMMING'}">Swimming</option>
+            <option value="PILATES"  th:selected="${specialtyFilter == 'PILATES'}">Pilates</option>
+            <option value="HIIT"     th:selected="${specialtyFilter == 'HIIT'}">HIIT</option>
+        </select>
+        <button type="submit" class="btn-apply">Apply</button>
+        <a th:href="@{/manager/trainers}" class="btn-reset">Reset</a>
+        <span class="row-count" th:text="${rows.size()} + ' row(s)'">0 rows</span>
+    </form>
+
+    <table th:if="${!rows.isEmpty()}">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Specialty</th>
+            <th>Status</th>
+            <th style="text-align:right;">Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${rows}">
+            <td th:text="${r.name}">Ahmet Yılmaz</td>
+            <td th:text="${r.username}">ahmet.y</td>
+            <td th:text="${r.email}">ahmet@isc.com</td>
+            <td th:text="${r.specialty}">FITNESS</td>
+            <td>
+                <span class="pill" th:classappend="'pill-' + ${r.status}" th:text="${r.status}">ACTIVE</span>
+                <span class="pill pill-LOCKED" th:if="${r.locked}">LOCKED</span>
+            </td>
+            <td style="text-align:right;">
+                <a th:href="@{|/manager/trainers/${r.id}/edit|}" class="btn-sm btn-edit">Edit</a>
+                <a th:if="${r.status == 'ACTIVE'}"
+                   th:href="@{|/manager/trainers/${r.id}/working-days|}"
+                   class="btn-sm btn-schedule">Working Days</a>
+                <a th:if="${r.status == 'ACTIVE'}"
+                   th:href="@{|/manager/trainers/${r.id}/lesson-slots|}"
+                   class="btn-sm btn-schedule">Lesson Slots</a>
+                <form class="inline-form" method="post"
+                      th:action="@{|/manager/trainers/${r.id}/toggle-active|}">
+                    <button type="submit" class="btn-sm btn-toggle"
+                            th:text="${r.status == 'ACTIVE' ? 'Deactivate' : 'Activate'}">Toggle</button>
+                </form>
+                <form class="inline-form" method="post" th:if="${r.locked}"
+                      th:action="@{|/manager/trainers/${r.id}/unlock|}">
+                    <button type="submit" class="btn-sm btn-unlock">Unlock</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="empty-state" th:if="${rows.isEmpty()}">
+        <span th:if="${statusFilter.isEmpty() and specialtyFilter.isEmpty()}">
+            No trainers yet. Click <strong>+ New Trainer</strong> to add one.
+        </span>
+        <span th:if="${!statusFilter.isEmpty() or !specialtyFilter.isEmpty()}">
+            No trainers match your filters.
+        </span>
+    </div>
+</div>
+</body>
+</html>

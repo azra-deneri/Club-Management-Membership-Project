@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ISC-MS — Members</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 1100px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #135200; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+
+        /* Search bar */
+        .toolbar {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .toolbar input[type=text] {
+            padding: 9px 12px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 6px; min-width: 240px;
+        }
+        .toolbar input[type=text]:focus { outline: none; border-color: #0071e3; }
+        .filter-select {
+            padding: 9px 12px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            background: white; color: #1d1d1f; cursor: pointer;
+        }
+        .filter-select:focus { outline: none; border-color: #0071e3; }
+        .btn {
+            padding: 9px 16px; border-radius: 6px; font-size: 13px;
+            text-decoration: none; border: none; cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-primary  { background: #0071e3; color: white; }
+        .btn-secondary{ background: #f5f5f7; color: #1d1d1f; }
+        .btn-danger   { background: #cf1322; color: white; }
+        .btn-warning  { background: #fa8c16; color: white; }
+        .btn-small    { padding: 4px 10px; font-size: 12px; }
+
+        /* Table */
+        table {
+            width: 100%; border-collapse: collapse; font-size: 13px;
+        }
+        thead {
+            background: #f5f5f7;
+        }
+        th {
+            text-align: left; padding: 10px 12px;
+            font-size: 11px; color: #6e6e73;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            border-bottom: 1px solid #e0e0e3;
+        }
+        td {
+            padding: 10px 12px; border-bottom: 1px solid #f0f0f0;
+            color: #1d1d1f;
+        }
+        tr:hover { background: #fafafa; }
+
+        /* Status pills */
+        .pill {
+            display: inline-block; padding: 2px 10px; border-radius: 12px;
+            font-size: 11px; font-weight: 600;
+        }
+        .pill-ACTIVE        { background: #f6ffed; color: #135200; }
+        .pill-PAYMENT_HOLD  { background: #fff7e6; color: #874d00; }
+        .pill-PASSIVE       { background: #f5f5f7; color: #6e6e73; }
+        .pill-FROZEN        { background: #e6f7ff; color: #0050b3; }
+        .pill-SUSPENDED     { background: #fff2f0; color: #cf1322; }
+        .pill-PENDING       { background: #fff7e6; color: #874d00; }
+
+        .row-count {
+            font-size: 12px; color: #6e6e73; margin-left: auto;
+        }
+        .empty-state {
+            text-align: center; padding: 40px 20px;
+            color: #6e6e73; font-size: 14px; font-style: italic;
+        }
+        form.inline-form { display: inline; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Members</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <!-- Search + filter toolbar -->
+    <form method="get" th:action="@{/manager/members}" class="toolbar">
+        <input type="text" name="q" th:value="${query}" placeholder="Search by name or phone…" />
+
+        <select name="status" class="filter-select">
+            <option value="ALL"          th:selected="${selectedStatus == ''}">All statuses</option>
+            <option value="ACTIVE"       th:selected="${selectedStatus == 'ACTIVE'}">Active</option>
+            <option value="PAYMENT_HOLD" th:selected="${selectedStatus == 'PAYMENT_HOLD'}">Payment Hold</option>
+            <option value="FROZEN"       th:selected="${selectedStatus == 'FROZEN'}">Frozen</option>
+            <option value="PASSIVE"      th:selected="${selectedStatus == 'PASSIVE'}">Passive</option>
+            <option value="SUSPENDED"    th:selected="${selectedStatus == 'SUSPENDED'}">Suspended</option>
+            <option value="PENDING"      th:selected="${selectedStatus == 'PENDING'}">Pending</option>
+        </select>
+
+        <select name="tier" class="filter-select">
+            <option value="ALL"     th:selected="${selectedTier == ''}">All tiers</option>
+            <option value="CLASSIC" th:selected="${selectedTier == 'CLASSIC'}">Classic</option>
+            <option value="GOLD"    th:selected="${selectedTier == 'GOLD'}">Gold</option>
+            <option value="VIP"     th:selected="${selectedTier == 'VIP'}">VIP</option>
+            <option value="NONE"    th:selected="${selectedTier == 'NONE'}">No active membership</option>
+        </select>
+
+        <button type="submit" class="btn btn-primary">Apply</button>
+        <a th:href="@{/manager/members}" class="btn btn-secondary">Reset</a>
+        <span class="row-count" th:text="${members.size()} + ' member(s)'">0 members</span>
+    </form>
+
+    <!-- Members table -->
+    <table th:if="${!members.isEmpty()}">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Tier</th>
+            <th>Created</th>
+            <th style="text-align:right;">Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="m : ${members}">
+            <td th:text="${m.name}">Fatma Aslan</td>
+            <td th:text="${m.phone}">5554445566</td>
+            <td th:text="${m.email}">fatma@example.com</td>
+            <td>
+                <span class="pill" th:classappend="'pill-' + ${m.status}" th:text="${m.status}">ACTIVE</span>
+            </td>
+            <td th:text="${m.tier}">GOLD</td>
+            <td th:text="${m.createdDate}">2026-02-04</td>
+            <td style="text-align:right;">
+                <form class="inline-form" method="post"
+                      th:action="@{|/manager/members/${m.id}/suspend|}"
+                      onsubmit="return confirm('Suspend this member?');">
+                    <button type="submit" class="btn btn-danger btn-small"
+                            th:disabled="${m.status == 'SUSPENDED'}">
+                        Suspend
+                    </button>
+                </form>
+                <form class="inline-form" method="post"
+                      th:action="@{|/manager/members/${m.id}/unlock|}">
+                    <button type="submit" class="btn btn-warning btn-small">
+                        Unlock
+                    </button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="empty-state" th:if="${members.isEmpty()}">
+        <span th:if="${!query.isEmpty()}">No members match your search.</span>
+        <span th:if="${query.isEmpty()}">No members yet.</span>
+    </div>
+</div>
+</body>
+</html>

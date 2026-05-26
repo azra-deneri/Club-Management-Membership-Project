@@ -135,10 +135,11 @@ public class MemberService {
                 .filter(r -> r.getRequestId() == requestId)
                 .findFirst()
                 .ifPresent(r -> {
-                    if ("RENEWAL".equals(r.getType())) {
-                        requestDAO.updateRegistrationStatus(requestId, "REJECTED");
-                    } else {
-                        requestDAO.deleteRegistration(requestId);
+                    // Mark the request REJECTED so it remains visible in the audit
+                    // trail. For NEW/INITIAL the placeholder member account is
+                    // deleted so the same phone/email can register again.
+                    requestDAO.updateRegistrationStatus(requestId, "REJECTED");
+                    if (!"RENEWAL".equals(r.getType())) {
                         memberDAO.deleteById(r.getMemberId());
                     }
                 });
@@ -148,13 +149,15 @@ public class MemberService {
         List<RegistrationRequest> pending = requestDAO.findPendingRegistrations();
         pending.stream()
                 .filter(r -> r.getExpiresAt().isBefore(LocalDateTime.now()))
+                .filter(r -> !"RENEWAL".equals(r.getType()))
                 .forEach(r -> {
-                    if (!"RENEWAL".equals(r.getType())) {
-                        requestDAO.deleteRegistration(r.getRequestId());
-                        memberDAO.deleteById(r.getMemberId());
-                    }
+                    // The request itself stays in the DB — the bulk update below
+                    // flips its status to EXPIRED so it remains visible in the
+                    // audit trail. Only the placeholder member is removed so the
+                    // phone/email can be reused.
+                    memberDAO.deleteById(r.getMemberId());
                 });
-        requestDAO.expireOldRegistrationRequests();
+        requestDAO.expireOldRegistrationRequests();   // PENDING → EXPIRED in bulk
 
         List<TierUpgradeRequest> pendingUpgrades = requestDAO.findPendingTierUpgrades();
         pendingUpgrades.stream()
@@ -230,9 +233,22 @@ public class MemberService {
 
     // Online flow: PASSIVE member renews via card payment. Same shape as self-register
     // but for an existing member — no new member row, just status reset and a fresh membership.
+    //
+    // BR-78: ANNUAL_INSTALLMENT is a 12-month commitment. A member who has unpaid
+    // installments from a previous membership cannot renew until that debt is cleared.
+    // This prevents members from gaming the system by paying a few installments,
+    // letting the membership go PASSIVE, then renewing with a clean slate.
     public void selfRenewMembership(int memberId, String tier, String packageType) {
         Member member = memberDAO.findById(memberId)
                 .orElseThrow(() -> new IllegalStateException("Member not found: " + memberId));
+
+        // BR-78: Block renewal if there are unpaid installments on file.
+        int unpaid = countUnpaidInstallments(memberId);
+        if (unpaid > 0) {
+            throw new IllegalStateException(
+                    "You have " + unpaid + " unpaid installment(s) from your previous membership. "
+                            + "Please pay all installments before renewing.");
+        }
 
         memberDAO.updateStatus(member.getMemberId(), "ACTIVE");
         // Member is back — clear the cancellation flag and the passive countdown
@@ -252,6 +268,14 @@ public class MemberService {
             createInstallmentSchedule(ms.getMembershipId(), memberId,
                     calculateAmount(tier, packageType), firstPayment.getPaymentId());
         }
+    }
+    // BR-78 helper: counts PENDING + OVERDUE installments across ALL of this
+    // member's memberships (including PASSIVE ones). Used to block renewal
+    // when there's outstanding debt from a previous ANNUAL_INSTALLMENT membership.
+    public int countUnpaidInstallments(int memberId) {
+        return (int) installmentDAO.findByMemberId(memberId).stream()
+                .filter(i -> "PENDING".equals(i.getStatus()) || "OVERDUE".equals(i.getStatus()))
+                .count();
     }
 
     // Online flow: tier upgrade via card payment. Package stays the same.
@@ -388,6 +412,12 @@ public class MemberService {
 
         if (!"PAYMENT_HOLD".equals(m.getStatus())) return false;
 
+        // Only reactivate if there's an ACTIVE membership contract. Without one,
+        // the member's "ACTIVE" status would be inconsistent with their membership
+        // state — they'd be PAYMENT_HOLD with an expired contract, not an active one.
+        Optional<Membership> activeMs = membershipDAO.findActiveByMemberId(memberId);
+        if (activeMs.isEmpty()) return false;
+
         // Refresh OVERDUE flags before counting — a freshly-paid installment
         // should already be PAID, but sweeping is cheap insurance.
         markOverdueInstallments();
@@ -407,6 +437,14 @@ public class MemberService {
     // Returns all installments for a member (for the Installments tab UI)
     public List<Installment> getInstallmentsForMember(int memberId) {
         return installmentDAO.findByMemberId(memberId);
+    }
+
+
+    // Returns installments scoped to ONE membership — used by the Installments
+    // tab so stale rows from a previous (now PASSIVE) membership don't show up
+    // after a renewal.
+    public List<Installment> getInstallmentsForMembership(int membershipId) {
+        return installmentDAO.findByMembershipId(membershipId);
     }
 
     // Returns only OVERDUE + PENDING-past-due installments for a member
@@ -667,5 +705,109 @@ public class MemberService {
         payment.setInstallmentId(installmentId);
         paymentDAO.insert(payment);
         return payment;
+    }
+    /**
+     * Phase 2: Unfreeze a membership early and refund the unused frozen days.
+     * Reads the latest freeze_log entry, computes how many days remain between
+     * today and the planned freeze_end, and deducts those unused days from the
+     * membership's end_date. Also flips the membership and member status back to ACTIVE.
+     */
+    public void unfreezeMembershipPartial(int membershipId) {
+        Optional<Membership> opt = membershipDAO.findById(membershipId);
+        if (opt.isEmpty()) throw new IllegalStateException("Membership not found: " + membershipId);
+        Membership ms = opt.get();
+
+        if (!"FROZEN".equals(ms.getStatus()))
+            throw new IllegalStateException("Membership is not frozen.");
+
+        Optional<FreezeLog> logOpt = membershipDAO.findLatestFreezeLog(membershipId);
+        if (logOpt.isEmpty())
+            throw new IllegalStateException("No freeze log found for this membership.");
+
+        FreezeLog log = logOpt.get();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        long unusedDays = java.time.temporal.ChronoUnit.DAYS.between(today, log.freezeEnd());
+        if (unusedDays < 0) unusedDays = 0;
+
+        java.time.LocalDate newEnd = ms.getEndDate().minusDays(unusedDays);
+
+        membershipDAO.updateEndDate(membershipId, newEnd);
+        membershipDAO.updateStatus(membershipId, "ACTIVE");
+
+        memberDAO.updateStatus(ms.getMemberId(), "ACTIVE");
+    }
+
+    // ============================================================
+    // PHASE 2: Strict chronological payment order + PASSIVE escalation
+    // BR-76: Installments must be paid in chronological order (oldest first).
+    // BR-77: 6+ OVERDUE installments escalate the member to PASSIVE.
+    // ============================================================
+
+    private static final int OVERDUE_THRESHOLD_FOR_PASSIVE = 6;
+
+    /** Throws if any earlier installment is still PENDING/OVERDUE. */
+    public void assertCanPayInstallment(int installmentId) {
+        Installment target = installmentDAO.findById(installmentId)
+                .orElseThrow(() -> new IllegalStateException("Installment not found: " + installmentId));
+
+        for (Installment other : installmentDAO.findByMemberId(target.getMemberId())) {
+            if (other.getInstallmentId() == target.getInstallmentId()) continue;
+            if (other.getInstallmentNo() < target.getInstallmentNo()) {
+                String st = other.getStatus();
+                if ("PENDING".equals(st) || "OVERDUE".equals(st)) {
+                    throw new IllegalStateException(
+                            "You must pay installment #" + other.getInstallmentNo()
+                                    + " before paying #" + target.getInstallmentNo() + ".");
+                }
+            }
+        }
+    }
+
+    /** Earliest unpaid installment (smallest installment_no with PENDING/OVERDUE). */
+    public Optional<Installment> findEarliestUnpaid(int memberId) {
+        return installmentDAO.findByMemberId(memberId).stream()
+                .filter(i -> "PENDING".equals(i.getStatus()) || "OVERDUE".equals(i.getStatus()))
+                .min((a, b) -> Integer.compare(a.getInstallmentNo(), b.getInstallmentNo()));
+    }
+
+    /**
+     * Payment with chronological check. PAYMENT_HOLD/ACTIVE transitions are
+     * handled by reactivateIfPaidUp() inside payInstallment() itself.
+     */
+    public void payInstallmentInOrder(int installmentId) {
+        assertCanPayInstallment(installmentId);
+        payInstallment(installmentId);
+    }
+
+    // ============================================================
+    // PROJECT 2 — REPORTS SWEEP
+    // ============================================================
+
+    /**
+     * Sweeps all ACTIVE members whose current membership end date is in the past
+     * and transitions them to PASSIVE (mirroring the AuthService login check).
+     * Used by the Reports page so operational lists never show "stuck" ACTIVE
+     * members with negative days-left.
+     *
+     * Returns the number of members transitioned.
+     *
+     * NOTE: This duplicates the AuthService "lazy expiration" logic deliberately.
+     * Project 1 expired members only on next login; this sweep makes the same
+     * decision proactively so Reports never displays stale data.
+     */
+    public int sweepExpiredActiveMembers() {
+        int count = 0;
+        LocalDate today = LocalDate.now();
+        for (Member m : memberDAO.findByStatus("ACTIVE")) {
+            Optional<Membership> ms = membershipDAO.findActiveByMemberId(m.getMemberId());
+            if (ms.isEmpty()) continue;
+            if (ms.get().getEndDate().isBefore(today)) {
+                membershipDAO.updateStatus(ms.get().getMembershipId(), "PASSIVE");
+                memberDAO.updateStatus(m.getMemberId(), "PASSIVE");
+                memberDAO.setPassiveSince(m.getMemberId(), LocalDateTime.now());
+                count++;
+            }
+        }
+        return count;
     }
 }

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${ev.eventName} + ' — ISC-MS'">Event Detail</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 900px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        h2 { margin: 28px 0 12px; font-size: 16px; color: #1d1d1f; }
+        .top-link, .btn {
+            padding: 8px 16px; border-radius: 6px; font-size: 13px;
+            text-decoration: none; border: none; cursor: pointer; font-weight: 500;
+        }
+        .top-link { background: #f5f5f7; color: #1d1d1f; }
+        .btn-primary { background: #0071e3; color: white; }
+        .btn-secondary { background: #f5f5f7; color: #1d1d1f; }
+        .btn-danger { background: #cf1322; color: white; }
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #135200; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+
+        .info-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            background: #fafafa; border: 1px solid #ececec;
+            border-radius: 8px; padding: 16px; margin-bottom: 16px;
+        }
+        @media (max-width: 600px) { .info-grid { grid-template-columns: 1fr; } }
+        .info-grid .label { font-size: 11px; color: #6e6e73;
+                            text-transform: uppercase; letter-spacing: 0.5px; }
+        .info-grid .value { font-size: 14px; color: #1d1d1f; margin-top: 2px; }
+
+        .pill { display: inline-block; padding: 2px 10px; border-radius: 12px;
+                font-size: 11px; font-weight: 600; }
+        .pill-ACTIVE    { background: #f6ffed; color: #135200; }
+        .pill-CANCELLED { background: #fff2f0; color: #cf1322; }
+        .pill-EXPIRED   { background: #f5f5f7; color: #6e6e73; }
+
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+        form.inline-form { display: inline; }
+
+        .capacity-form {
+            display: flex; gap: 8px; align-items: end; flex-wrap: wrap;
+            background: #f0f7ff; border: 1px solid #91d5ff;
+            border-radius: 8px; padding: 12px; margin-top: 12px;
+        }
+        .capacity-form label { font-size: 12px; color: #0050b3; display: block; margin-bottom: 4px; }
+        .capacity-form input { padding: 8px 10px; font-size: 13px;
+                               border: 1px solid #d2d2d7; border-radius: 6px; width: 100px; }
+        .capacity-form button { padding: 9px 16px; font-size: 13px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead { background: #f5f5f7; }
+        th { text-align: left; padding: 10px 12px; font-size: 11px; color: #6e6e73;
+             text-transform: uppercase; letter-spacing: 0.5px;
+             border-bottom: 1px solid #e0e0e3; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+        .empty-state {
+            text-align: center; padding: 16px; color: #6e6e73;
+            font-size: 13px; font-style: italic;
+            background: #fafafa; border-radius: 8px;
+        }
+        .description-box {
+            background: #fafafa; border: 1px solid #ececec;
+            border-radius: 8px; padding: 14px; font-size: 13px; color: #1d1d1f;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1 th:text="${ev.eventName}">Morning Yoga</h1>
+        <a th:href="@{/manager/events}" class="top-link">← Back to Events</a>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <div class="info-grid">
+        <div>
+            <div class="label">Category</div>
+            <div class="value" th:text="${ev.category}">YOGA</div>
+        </div>
+        <div>
+            <div class="label">Status</div>
+            <div class="value">
+                <span class="pill" th:classappend="'pill-' + ${ev.status}" th:text="${ev.status}">ACTIVE</span>
+            </div>
+        </div>
+        <div>
+            <div class="label">Date</div>
+            <div class="value" th:text="${ev.eventDate}">2026-06-10</div>
+        </div>
+        <div>
+            <div class="label">Time</div>
+            <div class="value" th:text="${ev.startTime + ' – ' + ev.endTime}">10:00 – 11:00</div>
+        </div>
+        <div>
+            <div class="label">Location</div>
+            <div class="value" th:text="${ev.location != null and !ev.location.isEmpty() ? ev.location : '—'}">Studio A</div>
+        </div>
+        <div>
+            <div class="label">Registered / Capacity</div>
+            <div class="value" th:text="${registered} + ' / ' + ${ev.capacity}">3 / 10</div>
+        </div>
+    </div>
+
+    <div th:if="${ev.description != null and !ev.description.isEmpty()}">
+        <h2>Description</h2>
+        <div class="description-box" th:text="${ev.description}">Event description here.</div>
+    </div>
+
+    <!-- Action buttons (only when ACTIVE — cancelled/expired events are read-only) -->
+    <div class="actions" th:if="${ev.status == 'ACTIVE'}">
+        <a th:href="@{|/manager/events/${ev.eventId}/edit|}" class="btn btn-primary">Edit Details</a>
+        <form class="inline-form" method="post"
+              th:action="@{|/manager/events/${ev.eventId}/cancel|}"
+              onsubmit="return confirm('Cancel this event? All member registrations will also be cancelled.');">
+            <button type="submit" class="btn btn-danger">Cancel Event</button>
+        </form>
+    </div>
+
+    <!-- Capacity increase form (only when ACTIVE) -->
+    <form th:if="${ev.status == 'ACTIVE'}" method="post"
+          th:action="@{|/manager/events/${ev.eventId}/capacity|}"
+          class="capacity-form">
+        <div>
+            <label>Increase Capacity To</label>
+            <input type="number" name="newCapacity" th:value="${ev.capacity + 1}"
+                   th:min="${ev.capacity + 1}" required/>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Capacity</button>
+    </form>
+
+    <h2>Participants <span style="font-weight:400; color:#6e6e73; font-size:13px;"
+                           th:text="'(' + ${registered} + ')'">(0)</span></h2>
+
+    <table th:if="${!participants.isEmpty()}">
+        <thead>
+        <tr>
+            <th>Member ID</th>
+            <th>Member Name</th>
+            <th>Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="p : ${participants}">
+            <td th:text="${p.memberId}">42</td>
+            <td th:text="${p.memberName}">Fatma Aslan</td>
+            <td th:text="${p.status}">REGISTERED</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="empty-state" th:if="${participants.isEmpty()}">
+        No registered participants yet.
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISC-MS — Add Member</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 720px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        .alert-info    { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+
+        /* Form layout — single column, mobile-friendly */
+        .field { margin-bottom: 14px; }
+        .field label {
+            display: block; font-size: 12px; color: #6e6e73;
+            margin-bottom: 4px; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .field input, .field select {
+            width: 100%; padding: 10px 12px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            box-sizing: border-box; background: white;
+        }
+        .field input:focus, .field select:focus {
+            outline: none; border-color: #0071e3;
+        }
+        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 520px) { .row-2 { grid-template-columns: 1fr; } }
+
+        .amount-box {
+            background: #f0f7ff; border: 1px solid #91d5ff;
+            border-radius: 8px; padding: 14px 16px; margin: 16px 0;
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 8px;
+        }
+        .amount-box .label { font-size: 12px; color: #0050b3;
+                             text-transform: uppercase; letter-spacing: 0.5px; }
+        .amount-box .value { font-size: 22px; font-weight: 700; color: #002766; }
+        .amount-box .note  { font-size: 12px; color: #0050b3; }
+
+        .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        .btn {
+            padding: 11px 22px; border-radius: 6px; font-size: 14px;
+            text-decoration: none; border: none; cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-primary  { background: #0071e3; color: white; }
+        .btn-primary:hover { background: #0077ed; }
+        .btn-secondary{ background: #f5f5f7; color: #1d1d1f; }
+        .required { color: #cf1322; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Add Member</h1>
+        <a th:href="@{/dashboard}" class="top-link">← Back to Dashboard</a>
+    </div>
+
+    <div class="alert alert-error" th:if="${error}" th:text="${error}"></div>
+
+    <div class="alert alert-info">
+        Cash registration creates an <strong>ACTIVE</strong> member immediately.
+        For installment plans, the member must self-register online.
+    </div>
+
+    <!-- Two-way bound form. On validation error the controller re-renders this
+         page with the same 'form' bean so the user doesn't lose their inputs. -->
+    <form method="post" th:action="@{/manager/add-member}" th:object="${form}">
+
+        <div class="field">
+            <label>Full Name <span class="required">*</span></label>
+            <input type="text" th:field="*{fullName}" required maxlength="100" />
+        </div>
+
+        <div class="row-2">
+            <div class="field">
+                <label>Date of Birth <span class="required">*</span></label>
+                <input type="date" th:field="*{dob}" required />
+            </div>
+            <div class="field">
+                <label>Gender <span class="required">*</span></label>
+                <select th:field="*{gender}" required>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row-2">
+            <div class="field">
+                <label>Phone (10 digits) <span class="required">*</span></label>
+                <input type="tel" th:field="*{phone}" required
+                       pattern="\d{10}" maxlength="10"
+                       inputmode="numeric" placeholder="5551234567" />
+            </div>
+            <div class="field">
+                <label>Email <span class="required">*</span></label>
+                <input type="email" th:field="*{email}" required maxlength="120" />
+            </div>
+        </div>
+
+        <div class="field">
+            <label>Password (min 8 chars) <span class="required">*</span></label>
+            <input type="text" th:field="*{password}" required minlength="8"
+                   maxlength="100" />
+        </div>
+
+        <div class="row-2">
+            <div class="field">
+                <label>Tier <span class="required">*</span></label>
+                <select id="sel-tier" th:field="*{tier}" required>
+                    <option value="CLASSIC">Classic — 750 TL/month</option>
+                    <option value="GOLD">Gold — 1,250 TL/month</option>
+                    <option value="VIP">VIP — 2,000 TL/month</option>
+                </select>
+            </div>
+            <div class="field">
+                <!-- ANNUAL_INSTALLMENT intentionally not offered (cash flow only) -->
+                <label>Package <span class="required">*</span></label>
+                <select id="sel-package" th:field="*{packageType}" required>
+                    <option value="MONTHLY">Monthly (30 days)</option>
+                    <option value="ANNUAL_PREPAID">Annual prepaid (15% off)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="amount-box">
+            <div>
+                <div class="label">Amount to Collect (Cash)</div>
+                <div class="value"><span id="amount-value">750.00</span> TL</div>
+            </div>
+            <div class="note" id="amount-note">per month</div>
+        </div>
+
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Add Member</button>
+            <a th:href="@{/manager/members}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Live amount preview — mirrors MemberService.calculateAmount() purely for
+    // display. The server always recomputes the real price on POST, so even if
+    // this JS is tampered with the manager cannot charge an incorrect amount.
+    const TIER_BASE_PRICE = { CLASSIC: 750, GOLD: 1250, VIP: 2000 };
+
+    const tierSelect    = document.getElementById('sel-tier');
+    const packageSelect = document.getElementById('sel-package');
+    const amountValue   = document.getElementById('amount-value');
+    const amountNote    = document.getElementById('amount-note');
+
+    function updateAmount() {
+        const base = TIER_BASE_PRICE[tierSelect.value] || 0;
+        const pkg  = packageSelect.value;
+        let amount, note;
+        if (pkg === 'ANNUAL_PREPAID') {
+            amount = base * 12 * 0.85;
+            note   = 'total for 12 months (15% off)';
+        } else {
+            amount = base;
+            note   = 'per month';
+        }
+        amountValue.textContent = amount.toFixed(2);
+        amountNote.textContent  = note;
+    }
+
+    tierSelect.addEventListener('change', updateAmount);
+    packageSelect.addEventListener('change', updateAmount);
+    updateAmount();   // initial render after potential form re-render
+</script>
+</body>
+</html>

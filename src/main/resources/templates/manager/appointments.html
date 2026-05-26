@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISC-MS — Appointments</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 1200px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .header { display: flex; justify-content: space-between; align-items: center;
+                  margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        h1 { margin: 0; color: #1d1d1f; font-size: 24px; }
+        .header-actions { display: flex; gap: 8px; }
+        .top-link {
+            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+        }
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #135200; }
+        .alert-error   { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+
+        .filter-bar {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+            background: #fafafa; border: 1px solid #ececec; border-radius: 8px;
+            padding: 10px 12px; margin-bottom: 12px;
+        }
+        .filter-bar select {
+            padding: 6px 10px; font-size: 12px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            background: white; cursor: pointer;
+        }
+        .filter-bar .btn-apply  { background: #0071e3; color: white; padding: 6px 14px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; }
+        .filter-bar .btn-reset  { background: #f5f5f7; color: #1d1d1f; padding: 6px 14px; font-size: 12px; border-radius: 6px; text-decoration: none; }
+        .filter-bar .row-count  { font-size: 11px; color: #6e6e73; margin-left: auto; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead { background: #f5f5f7; }
+        th { text-align: left; padding: 10px 12px; font-size: 11px; color: #6e6e73;
+             text-transform: uppercase; letter-spacing: 0.5px;
+             border-bottom: 1px solid #e0e0e3; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; color: #1d1d1f; }
+        tr:hover { background: #fafafa; }
+
+        .pill { display: inline-block; padding: 2px 10px; border-radius: 12px;
+                font-size: 11px; font-weight: 600; }
+        .pill-SCHEDULED { background: #fff7e6; color: #874d00; }
+        .pill-COMPLETED { background: #f6ffed; color: #135200; }
+        .pill-CANCELLED { background: #fff2f0; color: #cf1322; }
+        .pill-NO_SHOW   { background: #fff1f0; color: #a8071a; }
+
+        .btn-sm {
+            padding: 4px 10px; font-size: 11px; border-radius: 4px;
+            border: none; cursor: pointer; font-weight: 500;
+            display: inline-block; margin-right: 4px;
+        }
+        .btn-cancel   { background: #cf1322; color: white; }
+        .btn-complete { background: #237804; color: white; }
+        .btn-noshow   { background: #a8071a; color: white; }
+        form.inline-form { display: inline; }
+
+        .empty-state {
+            text-align: center; padding: 24px; color: #6e6e73;
+            font-size: 14px; font-style: italic;
+            background: #fafafa; border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Appointments</h1>
+        <div class="header-actions">
+            <a th:href="@{/manager/trainers}" class="top-link">← Back to Trainers</a>
+            <a th:href="@{/dashboard}" class="top-link">Dashboard</a>
+        </div>
+    </div>
+
+    <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+    <div class="alert alert-error"   th:if="${error}"   th:text="${error}"></div>
+
+    <form method="get" th:action="@{/manager/appointments}" class="filter-bar">
+        <select name="status">
+            <option value="ALL"       th:selected="${statusFilter == ''}">All statuses</option>
+            <option value="SCHEDULED" th:selected="${statusFilter == 'SCHEDULED'}">Scheduled</option>
+            <option value="COMPLETED" th:selected="${statusFilter == 'COMPLETED'}">Completed</option>
+            <option value="CANCELLED" th:selected="${statusFilter == 'CANCELLED'}">Cancelled</option>
+            <option value="NO_SHOW"   th:selected="${statusFilter == 'NO_SHOW'}">No-show</option>
+        </select>
+        <select name="trainer">
+            <option value="ALL" th:selected="${trainerFilter == ''}">All trainers</option>
+            <option th:each="o : ${trainerOptions}"
+                    th:value="${o.id}"
+                    th:selected="${trainerFilter == #strings.toString(o.id)}"
+                    th:text="${o.name}">Trainer</option>
+        </select>
+        <button type="submit" class="btn-apply">Apply</button>
+        <a th:href="@{/manager/appointments}" class="btn-reset">Reset</a>
+        <span class="row-count" th:text="${rows.size()} + ' row(s)'">0 rows</span>
+    </form>
+
+    <table th:if="${!rows.isEmpty()}">
+        <thead>
+        <tr>
+            <th>Member</th>
+            <th>Trainer</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${rows}">
+            <td th:text="${r.memberName}">Member</td>
+            <td th:text="${r.trainerName}">Trainer</td>
+            <td th:text="${r.date}">2026-06-15</td>
+            <td th:text="${r.time}">10:00 – 11:00</td>
+            <td>
+                <span class="pill" th:classappend="'pill-' + ${r.status}" th:text="${r.status}">SCHEDULED</span>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="empty-state" th:if="${rows.isEmpty()}">
+        <span th:if="${statusFilter.isEmpty() and trainerFilter.isEmpty()}">
+            No appointments on file.
+        </span>
+        <span th:if="${!statusFilter.isEmpty() or !trainerFilter.isEmpty()}">
+            No appointments match your filters.
+        </span>
+    </div>
+</div>
+</body>
+</html>
