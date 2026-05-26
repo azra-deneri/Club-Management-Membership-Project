@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="'Error ' + ${status} + ' — Istanbul Sports Club'">Error</title>
+    <link rel="stylesheet" th:href="@{/css/iscms.css}">
+    <style>
+        /* Page-specific layout for the error screen. Kept inline because
+           this is a one-off view; common styles live in iscms.css. */
+        .error-shell {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a2e;
+            padding: 24px;
+            font-family: 'Inter', sans-serif;
+            color: #f5f5f5;
+        }
+        .error-card {
+            max-width: 540px;
+            width: 100%;
+            background: #23233a;
+            border: 1px solid #2f2f47;
+            border-radius: 12px;
+            padding: 48px 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+        .error-status {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 96px;
+            line-height: 1;
+            color: #e63946;
+            letter-spacing: 2px;
+            margin: 0 0 8px;
+        }
+        .error-status-text {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 32px;
+            letter-spacing: 3px;
+            color: #f5f5f5;
+            margin: 0 0 24px;
+        }
+        .error-message {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #c8c8d0;
+            margin: 0 0 32px;
+        }
+        .error-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn-primary, .btn-secondary {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            text-decoration: none;
+            letter-spacing: 0.5px;
+            transition: transform 0.15s, background 0.15s;
+        }
+        .btn-primary {
+            background: #e63946;
+            color: #ffffff;
+        }
+        .btn-primary:hover {
+            background: #c92d3a;
+            transform: translateY(-1px);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: #f5f5f5;
+            border: 1px solid #4a4a66;
+        }
+        .btn-secondary:hover {
+            background: #2f2f47;
+            transform: translateY(-1px);
+        }
+        .error-brand {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 14px;
+            letter-spacing: 4px;
+            color: #6b6b7d;
+            margin-top: 32px;
+        }
+    </style>
+</head>
+<body>
+<div class="error-shell">
+    <div class="error-card">
+        <h1 class="error-status" th:text="${status} ?: 500">500</h1>
+        <p class="error-status-text" th:text="${statusText} ?: 'Something Went Wrong'">Something Went Wrong</p>
+        <p class="error-message"
+           th:text="${message} ?: 'An unexpected error occurred. Please try again later.'">
+            An unexpected error occurred. Please try again later.
+        </p>
+
+        <div class="error-actions">
+            <a href="/dashboard" class="btn-primary">Return to Dashboard</a>
+            <a href="/login" class="btn-secondary">Sign In Again</a>
+        </div>
+
+        <p class="error-brand">ISTANBUL SPORTS CLUB</p>
+    </div>
+</div>
+</body>
+</html>

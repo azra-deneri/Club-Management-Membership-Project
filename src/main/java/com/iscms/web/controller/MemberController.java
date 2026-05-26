@@ -1,5 +1,7 @@
 package com.iscms.web.controller;
 
+import com.iscms.exception.MemberNotFoundException;
+import com.iscms.exception.UnauthorizedAccessException;
 import com.iscms.model.Installment;
 import com.iscms.model.Member;
 import com.iscms.model.Membership;
@@ -8,6 +10,7 @@ import com.iscms.service.MemberService;
 import com.iscms.service.MockPaymentProcessor;
 import com.iscms.service.PaymentResult;
 import com.iscms.service.policy.TierPolicyRegistry;
+import com.iscms.web.dto.DtoMapper;
 
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
@@ -27,6 +30,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Member-facing endpoints (profile, membership, installments, payments,
+ * tier upgrade, freeze/unfreeze, cancellation, renewal).
+ *
+ * Week 14 refactor notes:
+ *  - The previous "lookup member + redirect to login if missing" pattern
+ *    was duplicated at the top of every endpoint (8+ copies). It is now a
+ *    single private helper, loadCurrentMember(), which throws
+ *    MemberNotFoundException on the rare case where the session points to
+ *    a deleted member. GlobalExceptionHandler renders the friendly 404 page.
+ *    Net effect: ~30 lines of defensive duplication removed (Week 14 DRY).
+ *  - Three endpoints (profile, membership, renewForm) used to write a raw
+ *    Member entity to the model. They now write a MemberDTO instead, so the
+ *    BCrypt password hash cannot be reached through ${member.password} from
+ *    any Thymeleaf template (Week 14 Security Checkpoint).
+ *  - Scattered try/catch blocks that previously rethrew exceptions as flash
+ *    errors have been kept here only for *expected* business outcomes
+ *    (payment failures, freeze validation, etc.) where we want the user to
+ *    stay on the same page with a contextual message. Truly exceptional
+ *    failures bubble up to GlobalExceptionHandler.
+ */
 @Controller
 @RequestMapping("/member")
 public class MemberController {
@@ -48,19 +72,14 @@ public class MemberController {
 
     @GetMapping("/profile")
     public String profile(HttpSession session, Model model) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
+        Member member = loadCurrentMember(session);
 
-        Optional<Member> opt = memberService.getMemberById(sessionUser.getMemberId());
-        if (opt.isEmpty()) {
-            session.invalidate();
-            return "redirect:/login";
-        }
-
-        Member member = opt.get();
         boolean readOnly = "PAYMENT_HOLD".equals(member.getStatus())
-                        || "FROZEN".equals(member.getStatus());
-        model.addAttribute("member", member);
+                || "FROZEN".equals(member.getStatus());
+
+        // DTO instead of the raw entity — the view can no longer read
+        // password, failedAttempts, or isLocked even by accident.
+        model.addAttribute("member", DtoMapper.toMemberDTO(member));
         model.addAttribute("onPaymentHold", readOnly);
         return "member/profile";
     }
@@ -75,18 +94,10 @@ public class MemberController {
                                 HttpSession session,
                                 RedirectAttributes ra) {
 
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-
-        Optional<Member> opt = memberService.getMemberById(sessionUser.getMemberId());
-        if (opt.isEmpty()) {
-            session.invalidate();
-            return "redirect:/login";
-        }
-        Member member = opt.get();
+        Member member = loadCurrentMember(session);
 
         if ("PAYMENT_HOLD".equals(member.getStatus())
-         || "FROZEN".equals(member.getStatus())) {
+                || "FROZEN".equals(member.getStatus())) {
             ra.addFlashAttribute("error", "Profile editing is disabled while your account is frozen or on payment hold.");
             return "redirect:/member/profile";
         }
@@ -140,15 +151,7 @@ public class MemberController {
 
     @GetMapping("/membership")
     public String membership(HttpSession session, Model model) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-
-        Optional<Member> opt = memberService.getMemberById(sessionUser.getMemberId());
-        if (opt.isEmpty()) {
-            session.invalidate();
-            return "redirect:/login";
-        }
-        Member member = opt.get();
+        Member member = loadCurrentMember(session);
 
         Optional<Membership> active = memberService.getActiveMembership(member.getMemberId());
         Membership ms = null;
@@ -169,7 +172,8 @@ public class MemberController {
             MemberService.MembershipEligibility e =
                     memberService.computeMembershipEligibility(member, ms);
 
-            model.addAttribute("member", member);
+            // DTO instead of the raw Member entity — see class-level note.
+            model.addAttribute("member", DtoMapper.toMemberDTO(member));
             model.addAttribute("membership", ms);
             model.addAttribute("daysLeft", daysLeft);
             model.addAttribute("onPaymentHold",        e.onPaymentHold());
@@ -182,19 +186,14 @@ public class MemberController {
             return "member/membership";
         }
 
-        model.addAttribute("member", member);
+        model.addAttribute("member", DtoMapper.toMemberDTO(member));
         model.addAttribute("empty", true);
         return "member/membership";
     }
 
     @GetMapping("/membership/freeze")
     public String freezeForm(HttpSession session, Model model, RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-
-        Optional<Member> opt = memberService.getMemberById(sessionUser.getMemberId());
-        if (opt.isEmpty()) { session.invalidate(); return "redirect:/login"; }
-        Member member = opt.get();
+        Member member = loadCurrentMember(session);
 
         if ("PAYMENT_HOLD".equals(member.getStatus())) {
             ra.addFlashAttribute("error", "Freeze is unavailable while on Payment Hold.");
@@ -224,12 +223,7 @@ public class MemberController {
     public String freezeSubmit(@RequestParam int days,
                                HttpSession session,
                                RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-
-        Optional<Member> opt = memberService.getMemberById(sessionUser.getMemberId());
-        if (opt.isEmpty()) { session.invalidate(); return "redirect:/login"; }
-        Member member = opt.get();
+        Member member = loadCurrentMember(session);
 
         Optional<Membership> activeOpt = memberService.getActiveMembership(member.getMemberId());
         if (activeOpt.isEmpty()) {
@@ -255,12 +249,7 @@ public class MemberController {
 
     @PostMapping("/membership/unfreeze")
     public String unfreezeSubmit(HttpSession session, RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-
-        Optional<Member> opt = memberService.getMemberById(sessionUser.getMemberId());
-        if (opt.isEmpty()) { session.invalidate(); return "redirect:/login"; }
-        Member member = opt.get();
+        Member member = loadCurrentMember(session);
 
         List<Membership> history = memberService.getAllMemberships(member.getMemberId());
         Optional<Membership> frozen = history.stream()
@@ -395,7 +384,7 @@ public class MemberController {
         } catch (Exception ex) {
             ra.addFlashAttribute("error",
                     "Payment was processed but the upgrade could not be applied: " + ex.getMessage()
-                    + " Please contact the club.");
+                            + " Please contact the club.");
         }
         return "redirect:/member/membership";
     }
@@ -406,10 +395,9 @@ public class MemberController {
 
     @GetMapping("/payments")
     public String payments(HttpSession session, Model model) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
+        Member member = loadCurrentMember(session);
 
-        List<Payment> payments = memberService.getPaymentsByMember(sessionUser.getMemberId());
+        List<Payment> payments = memberService.getPaymentsByMember(member.getMemberId());
         model.addAttribute("payments", payments);
         return "member/payments";
     }
@@ -420,15 +408,14 @@ public class MemberController {
 
     @GetMapping("/installments")
     public String installments(HttpSession session, Model model) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
+        Member member = loadCurrentMember(session);
 
         // Show this tab if:
         //   (a) member has an active ANNUAL_INSTALLMENT membership, OR
         //   (b) member has unpaid installments from a previous membership
         //       that must be cleared (BR-78).
-        boolean hasActive = memberService.hasActiveInstallmentMembership(sessionUser.getMemberId());
-        int unpaid = memberService.countUnpaidInstallments(sessionUser.getMemberId());
+        boolean hasActive = memberService.hasActiveInstallmentMembership(member.getMemberId());
+        int unpaid = memberService.countUnpaidInstallments(member.getMemberId());
         if (!hasActive && unpaid == 0) {
             return "redirect:/member/membership";
         }
@@ -440,13 +427,13 @@ public class MemberController {
         // If active ANNUAL_INSTALLMENT membership exists, show its installments.
         // Otherwise (BR-78 case: PASSIVE member with leftover debt), show
         // every unpaid installment so the member can clear the debt.
-        Optional<Membership> activeMs = memberService.getActiveMembership(sessionUser.getMemberId());
+        Optional<Membership> activeMs = memberService.getActiveMembership(member.getMemberId());
         List<Installment> all;
         if (activeMs.isPresent() && hasActive) {
             all = memberService.getInstallmentsForMembership(activeMs.get().getMembershipId());
         } else {
             // BR-78 view: only the unpaid debt from the previous contract.
-            all = memberService.getInstallmentsForMember(sessionUser.getMemberId()).stream()
+            all = memberService.getInstallmentsForMember(member.getMemberId()).stream()
                     .filter(i -> "PENDING".equals(i.getStatus()) || "OVERDUE".equals(i.getStatus()))
                     .toList();
         }
@@ -457,7 +444,7 @@ public class MemberController {
 
         // Reload member so the PAYMENT_HOLD banner reflects any auto-applied
         // status change from the OVERDUE sweep above.
-        memberService.getMemberById(sessionUser.getMemberId())
+        memberService.getMemberById(member.getMemberId())
                 .ifPresent(refreshed -> session.setAttribute("user", refreshed));
         Member current = (Member) session.getAttribute("user");
 
@@ -466,7 +453,7 @@ public class MemberController {
         model.addAttribute("countPending", pending);
         model.addAttribute("countOverdue", overdue);
         // Phase 2: only the earliest unpaid installment is payable (BR-76).
-        Integer earliestUnpaidId = memberService.findEarliestUnpaid(sessionUser.getMemberId())
+        Integer earliestUnpaidId = memberService.findEarliestUnpaid(member.getMemberId())
                 .map(i -> i.getInstallmentId())
                 .orElse(null);
         model.addAttribute("earliestUnpaidId", earliestUnpaidId);
@@ -478,10 +465,9 @@ public class MemberController {
     public String installmentPaymentForm(@PathVariable int installmentId,
                                          HttpSession session, Model model,
                                          RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
+        Member member = loadCurrentMember(session);
 
-        Installment inst = findOwnInstallment(sessionUser, installmentId, ra);
+        Installment inst = findOwnInstallment(member, installmentId, ra);
         if (inst == null) return "redirect:/member/installments";
 
         if ("PAID".equals(inst.getStatus())) {
@@ -508,10 +494,9 @@ public class MemberController {
                                            HttpSession session,
                                            RedirectAttributes ra) {
 
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
+        Member member = loadCurrentMember(session);
 
-        Installment inst = findOwnInstallment(sessionUser, installmentId, ra);
+        Installment inst = findOwnInstallment(member, installmentId, ra);
         if (inst == null) return "redirect:/member/installments";
 
         if ("PAID".equals(inst.getStatus())) {
@@ -529,7 +514,7 @@ public class MemberController {
             memberService.payInstallmentInOrder(installmentId);
             // PAYMENT_HOLD may have been cleared by paying down the overdue count.
             // Refresh the session user so the next page reads the up-to-date status.
-            memberService.getMemberById(sessionUser.getMemberId())
+            memberService.getMemberById(member.getMemberId())
                     .ifPresent(refreshed -> session.setAttribute("user", refreshed));
             ra.addFlashAttribute("success", String.format(
                     "Payment successful — installment #%d paid.", inst.getInstallmentNo()));
@@ -541,9 +526,200 @@ public class MemberController {
     }
 
     // ========================================================================
+    // Membership cancellation (member self-service)
+    // ========================================================================
+
+    @PostMapping("/membership/cancel")
+    public String cancelMembership(HttpSession session, RedirectAttributes ra) {
+        Member member = loadCurrentMember(session);
+
+        try {
+            memberService.cancelMembership(member.getMemberId());
+            memberService.getMemberById(member.getMemberId())
+                    .ifPresent(refreshed -> session.setAttribute("user", refreshed));
+            ra.addFlashAttribute("success",
+                    "Your cancellation request has been recorded. Your membership will end on its current expiry date.");
+        } catch (Exception ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/member/membership";
+    }
+
+    @PostMapping("/membership/cancel/undo")
+    public String undoCancel(HttpSession session, RedirectAttributes ra) {
+        Member member = loadCurrentMember(session);
+
+        try {
+            memberDAO.clearCancellationRequested(member.getMemberId());
+            memberService.getMemberById(member.getMemberId())
+                    .ifPresent(refreshed -> session.setAttribute("user", refreshed));
+            ra.addFlashAttribute("success",
+                    "Cancellation withdrawn. Your membership will continue normally.");
+        } catch (Exception ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/member/membership";
+    }
+
+    // ========================================================================
+    // Membership renewal (member self-service, online payment)
+    // ========================================================================
+
+    @GetMapping("/membership/renew")
+    public String renewForm(HttpSession session, Model model, RedirectAttributes ra) {
+        Member member = loadCurrentMember(session);
+
+        // Renewal only makes sense for PASSIVE members.
+        if (!"PASSIVE".equals(member.getStatus())) {
+            return "redirect:/member/membership";
+        }
+
+        // BR-78: block renewal while there are unpaid installments from a
+        // previous membership. The member must clear that debt first.
+        int unpaid = memberService.countUnpaidInstallments(member.getMemberId());
+        if (unpaid > 0) {
+            ra.addFlashAttribute("error",
+                    "You have " + unpaid + " unpaid installment(s) from your previous membership. "
+                            + "Please pay them before renewing.");
+            return "redirect:/member/installments";
+        }
+
+        // Fee preview map: tier+package -> price.
+        Map<String, Double> feeByCombo = new LinkedHashMap<>();
+        for (String tier : new String[]{"CLASSIC", "GOLD", "VIP"}) {
+            for (String pkg : new String[]{"MONTHLY", "ANNUAL_PREPAID", "ANNUAL_INSTALLMENT"}) {
+                feeByCombo.put(tier + "|" + pkg, memberService.calculateAmount(tier, pkg));
+            }
+        }
+
+        // DTO instead of the raw Member entity — see class-level note.
+        model.addAttribute("member", DtoMapper.toMemberDTO(member));
+        model.addAttribute("feeByCombo", feeByCombo);
+        return "member/renew";
+    }
+
+    @PostMapping("/membership/renew")
+    public String renewProceed(@RequestParam String tier,
+                               @RequestParam String packageType,
+                               HttpSession session,
+                               RedirectAttributes ra) {
+        Member member = loadCurrentMember(session);
+        if (!"PASSIVE".equals(member.getStatus())) {
+            return "redirect:/member/membership";
+        }
+
+        // Validate inputs minimally; calculateAmount will throw if invalid.
+        try {
+            memberService.calculateAmount(tier, packageType);
+        } catch (Exception ex) {
+            ra.addFlashAttribute("error", "Please choose a valid tier and package.");
+            return "redirect:/member/membership/renew";
+        }
+        return "redirect:/member/membership/renew/pay?tier=" + tier + "&packageType=" + packageType;
+    }
+
+    @GetMapping("/membership/renew/pay")
+    public String renewPaymentForm(@RequestParam String tier,
+                                   @RequestParam String packageType,
+                                   HttpSession session,
+                                   Model model,
+                                   RedirectAttributes ra) {
+        Member member = loadCurrentMember(session);
+        if (!"PASSIVE".equals(member.getStatus())) {
+            return "redirect:/member/membership";
+        }
+
+        double amount;
+        try {
+            amount = memberService.calculateAmount(tier, packageType);
+        } catch (Exception ex) {
+            ra.addFlashAttribute("error", "Invalid tier or package.");
+            return "redirect:/member/membership/renew";
+        }
+
+        Map<String, String> hidden = new LinkedHashMap<>();
+        hidden.put("tier", tier);
+        hidden.put("packageType", packageType);
+
+        addPaymentTemplateAttrs(model,
+                "Renew Membership",
+                "Renewal: " + tier + " — " + packageType,
+                amount,
+                "/member/membership/renew/pay",
+                "/member/membership/renew",
+                hidden);
+        return "member/payment";
+    }
+
+    @PostMapping("/membership/renew/pay")
+    public String renewPayment(@RequestParam String tier,
+                               @RequestParam String packageType,
+                               @RequestParam String cardNumber,
+                               @RequestParam String cardName,
+                               @RequestParam String expiry,
+                               @RequestParam String cvv,
+                               HttpSession session,
+                               RedirectAttributes ra) {
+        Member member = loadCurrentMember(session);
+        if (!"PASSIVE".equals(member.getStatus())) {
+            return "redirect:/member/membership";
+        }
+
+        PaymentResult result = validateAndProcess(
+                cardNumber, cardName, expiry, cvv, ra,
+                "redirect:/member/membership/renew/pay?tier=" + tier + "&packageType=" + packageType);
+        if (result == null) {
+            return "redirect:/member/membership/renew/pay?tier=" + tier + "&packageType=" + packageType;
+        }
+
+        try {
+            memberService.selfRenewMembership(member.getMemberId(), tier, packageType);
+            memberService.getMemberById(member.getMemberId())
+                    .ifPresent(refreshed -> session.setAttribute("user", refreshed));
+            ra.addFlashAttribute("success",
+                    "Membership renewed — welcome back! Your new " + tier + " (" + packageType + ") membership is active.");
+        } catch (Exception ex) {
+            ra.addFlashAttribute("error",
+                    "Payment processed but renewal failed: " + ex.getMessage());
+            return "redirect:/member/membership/renew/pay?tier=" + tier + "&packageType=" + packageType;
+        }
+        return "redirect:/member/membership";
+    }
+
+    // ========================================================================
     // Helpers
     // ========================================================================
 
+    /**
+     * Loads the current member from the database, using the session user's ID.
+     * Centralizes the "session must exist + member must still exist in DB"
+     * check that previously lived at the top of every endpoint.
+     *
+     * Throws UnauthorizedAccessException if the caller isn't a signed-in
+     * member — handled by GlobalExceptionHandler as a 403 error page.
+     * Throws MemberNotFoundException if the session points to a member that
+     * has since been deleted — handled as a 404. The session is invalidated
+     * before throwing so a refresh sends the user back to the login screen.
+     */
+    private Member loadCurrentMember(HttpSession session) {
+        Object user = session.getAttribute("user");
+        String role = (String) session.getAttribute("role");
+        if (!(user instanceof Member sessionUser) || !"MEMBER".equals(role)) {
+            throw new UnauthorizedAccessException("Please sign in as a member to continue.");
+        }
+        return memberService.getMemberById(sessionUser.getMemberId())
+                .orElseThrow(() -> {
+                    session.invalidate();
+                    return new MemberNotFoundException(sessionUser.getMemberId());
+                });
+    }
+
+    /**
+     * Backwards-compatible accessor for code paths that need to know whether
+     * a member session exists without throwing on the failure case
+     * (e.g. early return to /login). Returns null when the session is empty
+     * or the role is wrong. Kept private to discourage new callers.
+     */
     private Member requireMemberSession(HttpSession session) {
         Object user = session.getAttribute("user");
         String role = (String) session.getAttribute("role");
@@ -626,13 +802,7 @@ public class MemberController {
 
     private UpgradeContext loadUpgradeContext(HttpSession session, RedirectAttributes ra) {
         UpgradeContext ctx = new UpgradeContext();
-
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) { ctx.redirect = "redirect:/login"; return ctx; }
-
-        Optional<Member> opt = memberService.getMemberById(sessionUser.getMemberId());
-        if (opt.isEmpty()) { session.invalidate(); ctx.redirect = "redirect:/login"; return ctx; }
-        ctx.member = opt.get();
+        ctx.member = loadCurrentMember(session);
 
         if ("PAYMENT_HOLD".equals(ctx.member.getStatus())) {
             ra.addFlashAttribute("error", "Tier upgrade is unavailable while on Payment Hold.");
@@ -701,184 +871,5 @@ public class MemberController {
         List<String> targetTiers = List.of();
         long daysLeft;
         String redirect;
-    }
-
-    // ========================================================================
-    // Membership cancellation (member self-service)
-    //
-    // Cancel: stamps cancellation_requested_at. The membership stays ACTIVE
-    // until end_date — the member keeps full access during that window.
-    // After end_date, the existing AuthService flow transitions the member to
-    // PASSIVE (renewal eligible for 1 year).
-    //
-    // Undo: clears the cancellation flag so the membership renews silently.
-    // ========================================================================
-
-    @PostMapping("/membership/cancel")
-    public String cancelMembership(HttpSession session, RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-
-        try {
-            memberService.cancelMembership(sessionUser.getMemberId());
-            // Refresh the session user so the page reflects the new flag.
-            memberService.getMemberById(sessionUser.getMemberId())
-                    .ifPresent(refreshed -> session.setAttribute("user", refreshed));
-            ra.addFlashAttribute("success",
-                    "Your cancellation request has been recorded. Your membership will end on its current expiry date.");
-        } catch (Exception ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/member/membership";
-    }
-
-
-    @PostMapping("/membership/cancel/undo")
-    public String undoCancel(HttpSession session, RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-
-        try {
-            memberDAO.clearCancellationRequested(sessionUser.getMemberId());
-            memberService.getMemberById(sessionUser.getMemberId())
-                    .ifPresent(refreshed -> session.setAttribute("user", refreshed));
-            ra.addFlashAttribute("success",
-                    "Cancellation withdrawn. Your membership will continue normally.");
-        } catch (Exception ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/member/membership";
-    }
-
-    // ========================================================================
-    // Membership renewal (member self-service, online payment)
-    //
-    // Available when the member is in PASSIVE state (their previous membership
-    // expired). Picks a new tier+package, pays online, MemberService creates a
-    // brand-new ACTIVE membership and clears all PASSIVE/cancellation markers.
-    // ========================================================================
-
-    @GetMapping("/membership/renew")
-    public String renewForm(HttpSession session, Model model, RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-
-        // Renewal only makes sense for PASSIVE members.
-        if (!"PASSIVE".equals(sessionUser.getStatus())) {
-            return "redirect:/member/membership";
-        }
-
-        // BR-78: block renewal while there are unpaid installments from a
-        // previous membership. The member must clear that debt first.
-        int unpaid = memberService.countUnpaidInstallments(sessionUser.getMemberId());
-        if (unpaid > 0) {
-            ra.addFlashAttribute("error",
-                    "You have " + unpaid + " unpaid installment(s) from your previous membership. "
-                            + "Please pay them before renewing.");
-            return "redirect:/member/installments";
-        }
-
-        // Fee preview map: tier+package -> price.
-        java.util.Map<String, Double> feeByCombo = new java.util.LinkedHashMap<>();
-        for (String tier : new String[]{"CLASSIC", "GOLD", "VIP"}) {
-            for (String pkg : new String[]{"MONTHLY", "ANNUAL_PREPAID", "ANNUAL_INSTALLMENT"}) {
-                feeByCombo.put(tier + "|" + pkg, memberService.calculateAmount(tier, pkg));
-            }
-        }
-
-        model.addAttribute("member", sessionUser);
-        model.addAttribute("feeByCombo", feeByCombo);
-        return "member/renew";
-    }
-
-    @PostMapping("/membership/renew")
-    public String renewProceed(@RequestParam String tier,
-                               @RequestParam String packageType,
-                               HttpSession session,
-                               RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-        if (!"PASSIVE".equals(sessionUser.getStatus())) {
-            return "redirect:/member/membership";
-        }
-
-        // Validate inputs minimally; calculateAmount will throw if invalid.
-        try {
-            memberService.calculateAmount(tier, packageType);
-        } catch (Exception ex) {
-            ra.addFlashAttribute("error", "Please choose a valid tier and package.");
-            return "redirect:/member/membership/renew";
-        }
-        return "redirect:/member/membership/renew/pay?tier=" + tier + "&packageType=" + packageType;
-    }
-
-    @GetMapping("/membership/renew/pay")
-    public String renewPaymentForm(@RequestParam String tier,
-                                   @RequestParam String packageType,
-                                   HttpSession session,
-                                   Model model,
-                                   RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-        if (!"PASSIVE".equals(sessionUser.getStatus())) {
-            return "redirect:/member/membership";
-        }
-
-        double amount;
-        try {
-            amount = memberService.calculateAmount(tier, packageType);
-        } catch (Exception ex) {
-            ra.addFlashAttribute("error", "Invalid tier or package.");
-            return "redirect:/member/membership/renew";
-        }
-
-        java.util.Map<String, String> hidden = new java.util.LinkedHashMap<>();
-        hidden.put("tier", tier);
-        hidden.put("packageType", packageType);
-
-        addPaymentTemplateAttrs(model,
-                "Renew Membership",
-                "Renewal: " + tier + " — " + packageType,
-                amount,
-                "/member/membership/renew/pay",
-                "/member/membership/renew",
-                hidden);
-        return "member/payment";
-    }
-
-    @PostMapping("/membership/renew/pay")
-    public String renewPayment(@RequestParam String tier,
-                               @RequestParam String packageType,
-                               @RequestParam String cardNumber,
-                               @RequestParam String cardName,
-                               @RequestParam String expiry,
-                               @RequestParam String cvv,
-                               HttpSession session,
-                               RedirectAttributes ra) {
-        Member sessionUser = requireMemberSession(session);
-        if (sessionUser == null) return "redirect:/login";
-        if (!"PASSIVE".equals(sessionUser.getStatus())) {
-            return "redirect:/member/membership";
-        }
-
-        com.iscms.service.PaymentResult result = validateAndProcess(
-                cardNumber, cardName, expiry, cvv, ra,
-                "redirect:/member/membership/renew/pay?tier=" + tier + "&packageType=" + packageType);
-        if (result == null) {
-            return "redirect:/member/membership/renew/pay?tier=" + tier + "&packageType=" + packageType;
-        }
-
-        try {
-            memberService.selfRenewMembership(sessionUser.getMemberId(), tier, packageType);
-            memberService.getMemberById(sessionUser.getMemberId())
-                    .ifPresent(refreshed -> session.setAttribute("user", refreshed));
-            ra.addFlashAttribute("success",
-                    "Membership renewed — welcome back! Your new " + tier + " (" + packageType + ") membership is active.");
-        } catch (Exception ex) {
-            ra.addFlashAttribute("error",
-                    "Payment processed but renewal failed: " + ex.getMessage());
-            return "redirect:/member/membership/renew/pay?tier=" + tier + "&packageType=" + packageType;
-        }
-        return "redirect:/member/membership";
     }
 }

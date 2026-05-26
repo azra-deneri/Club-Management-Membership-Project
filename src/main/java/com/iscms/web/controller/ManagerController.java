@@ -1,5 +1,8 @@
 package com.iscms.web.controller;
 
+import com.iscms.web.dto.DtoMapper;
+import com.iscms.web.dto.ManagerDTO;
+import com.iscms.web.dto.MemberRowDTO;
 import com.iscms.model.Manager;
 import com.iscms.model.Member;
 import com.iscms.model.Membership;
@@ -90,7 +93,10 @@ public class ManagerController {
         String fStatus   = (status == null || status.isBlank() || "ALL".equals(status)) ? "" : status;
         String fTier     = (tier == null || tier.isBlank() || "ALL".equals(tier)) ? "" : tier;
 
-        List<MemberRow> rows = new ArrayList<>();
+        // Row projections are now MemberRowDTO from the dto package — see
+        // Week 14 refactor: nested view-model classes that used to live
+        // inside the controller now sit alongside the other DTOs.
+        List<MemberRowDTO> rows = new ArrayList<>();
         for (Member m : memberService.getAllMembers()) {
             // Name/phone search.
             if (!query.isEmpty()
@@ -107,16 +113,7 @@ public class ManagerController {
             // Tier filter (NONE matches members without an active membership).
             if (!fTier.isEmpty() && !fTier.equals(memberTier)) continue;
 
-            rows.add(new MemberRow(
-                    m.getMemberId(),
-                    m.getFullName(),
-                    m.getPhone(),
-                    m.getEmail() != null ? m.getEmail() : "",
-                    m.getStatus(),
-                    "NONE".equals(memberTier) ? "-" : memberTier,
-                    m.getCreatedAt() != null ? m.getCreatedAt().toLocalDate().toString() : "-",
-                    m.isLocked()
-            ));
+            rows.add(DtoMapper.toMemberRowDTO(m, memberTier));
         }
         model.addAttribute("members", rows);
         model.addAttribute("query", query);
@@ -162,10 +159,6 @@ public class ManagerController {
         return null;
     }
 
-    // View-model used by the members table.
-    public record MemberRow(int id, String name, String phone, String email,
-                            String status, String tier, String createdDate,
-                            boolean locked) {}
 // ========================================================================
     // Add Member tab — Manager registers a member directly with cash payment.
     // ANNUAL_INSTALLMENT is intentionally NOT offered here (it requires the
@@ -1043,7 +1036,9 @@ public class ManagerController {
     public String profile(HttpSession session, Model model) {
         Manager mgr = requireManagerSession(session);
         if (mgr == null) return "redirect:/login";
-        model.addAttribute("manager", mgr);
+        // DTO instead of the raw Manager entity — password hash and lockout
+        // state can no longer be reached through the view layer (Week 14).
+        model.addAttribute("manager", DtoMapper.toManagerDTO(mgr));
         return "manager/profile";
     }
 

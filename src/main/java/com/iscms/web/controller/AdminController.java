@@ -4,6 +4,7 @@ import com.iscms.model.Manager;
 import com.iscms.service.AuthService;
 import com.iscms.service.ManagerService;
 import com.iscms.service.ReportService;
+import com.iscms.web.dto.DtoMapper;
 
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
@@ -29,6 +30,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * <p>All business rules live in the service layer
  * ({@code ManagerService}, {@code AuthService}). This controller is a thin
  * HTTP wiring layer and a session-guard.
+ *
+ * <p>Week 14 refactor: every endpoint that previously wrote a raw Manager
+ * entity (or a list of them) to the model now writes ManagerDTOs instead.
+ * The {@code /admin/managers} listing is the most critical case — without
+ * the DTO it would render every manager's BCrypt password hash into the
+ * page source. With the DTO, the password field doesn't exist on the
+ * view-model at all, so {@code ${manager.password}} resolves to empty
+ * for every manager in the list.
  */
 @Controller
 @RequestMapping("/admin")
@@ -62,7 +71,7 @@ public class AdminController {
     public String dashboard(HttpSession session, Model model) {
         Manager admin = currentAdmin(session);
         if (admin == null) return "redirect:/login";
-        model.addAttribute("admin", admin);
+        model.addAttribute("admin", DtoMapper.toManagerDTO(admin));
         return "admin/dashboard";
     }
 
@@ -72,8 +81,11 @@ public class AdminController {
     public String managers(HttpSession session, Model model) {
         Manager admin = currentAdmin(session);
         if (admin == null) return "redirect:/login";
-        model.addAttribute("admin", admin);
-        model.addAttribute("managers", managerService.getAllManagers());
+        // Critical refactor: the manager list previously exposed every manager's
+        // BCrypt password hash to the view. DtoMapper.toManagerDTOs strips them
+        // out — the password field doesn't exist on ManagerDTO at all.
+        model.addAttribute("admin",    DtoMapper.toManagerDTO(admin));
+        model.addAttribute("managers", DtoMapper.toManagerDTOs(managerService.getAllManagers()));
         return "admin/managers";
     }
 
@@ -133,7 +145,7 @@ public class AdminController {
     public String addManagerForm(HttpSession session, Model model) {
         Manager admin = currentAdmin(session);
         if (admin == null) return "redirect:/login";
-        model.addAttribute("admin", admin);
+        model.addAttribute("admin", DtoMapper.toManagerDTO(admin));
         return "admin/manager-form";
     }
 
@@ -154,7 +166,9 @@ public class AdminController {
                 fullName, username, email, password, role);
         if (error != null) {
             // Re-render form with the user's values so they don't retype everything.
-            model.addAttribute("admin", admin);
+            // Note: the password field is intentionally NOT echoed back — making
+            // the user retype it on validation failure is the safer default.
+            model.addAttribute("admin", DtoMapper.toManagerDTO(admin));
             model.addAttribute("error", error);
             model.addAttribute("fullName", fullName);
             model.addAttribute("username", username);
@@ -176,7 +190,7 @@ public class AdminController {
                     "Manager added: " + m.getFullName() + " (" + role + ").");
             return "redirect:/admin/managers";
         } catch (Exception ex) {
-            model.addAttribute("admin", admin);
+            model.addAttribute("admin", DtoMapper.toManagerDTO(admin));
             model.addAttribute("error", "Could not add manager: " + ex.getMessage());
             model.addAttribute("fullName", fullName);
             model.addAttribute("username", username);
@@ -185,6 +199,7 @@ public class AdminController {
             return "admin/manager-form";
         }
     }
+
     // ===================== ALL PAYMENTS =====================
 
     @GetMapping("/payments")
@@ -204,7 +219,7 @@ public class AdminController {
                 .filter(p -> "ALL".equals(statusFilter) || statusFilter.equals(p.status()))
                 .toList();
 
-        model.addAttribute("admin", admin);
+        model.addAttribute("admin", DtoMapper.toManagerDTO(admin));
         model.addAttribute("payments", filtered);
         model.addAttribute("totalCount", all.size());
         model.addAttribute("typeFilter", typeFilter);
@@ -218,7 +233,7 @@ public class AdminController {
     public String profile(HttpSession session, Model model) {
         Manager admin = currentAdmin(session);
         if (admin == null) return "redirect:/login";
-        model.addAttribute("admin", admin);
+        model.addAttribute("admin", DtoMapper.toManagerDTO(admin));
         return "admin/profile";
     }
 
@@ -257,5 +272,4 @@ public class AdminController {
         }
         return "redirect:/admin/profile";
     }
-
 }

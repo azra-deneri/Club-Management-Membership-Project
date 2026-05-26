@@ -4,7 +4,26 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="06cc4173-bd97-4bab-bc48-a91a6eb413dc" name="Changes" comment="" />
+    <list default="true" id="06cc4173-bd97-4bab-bc48-a91a6eb413dc" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/exception/InvalidMembershipException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/exception/MemberNotFoundException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/exception/PaymentFailedException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/exception/ResourceNotFoundException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/exception/UnauthorizedAccessException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/dto/DtoMapper.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/dto/ManagerDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/dto/MemberDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/dto/MemberRowDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/dto/TrainerDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/error.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/AdminController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/AdminController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/DashboardController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/DashboardController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/MemberController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/MemberController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/TrainerController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/TrainerController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/application.properties" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -176,7 +195,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java</url>
-          <line>1125</line>
+          <line>1120</line>
           <properties>
             <option name="lambda-ordinal" value="-1" />
           </properties>

@@ -7,8 +7,8 @@ import com.iscms.model.TrainerLessonSlot;
 import com.iscms.model.TrainerWorkingDay;
 import com.iscms.service.AuthService;
 import com.iscms.service.MemberService;
-import com.iscms.service.LoginResult;
 import com.iscms.service.PTService;
+import com.iscms.web.dto.DtoMapper;
 
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
@@ -37,6 +37,16 @@ import java.util.HashMap;
  *  - update their own profile (password change)
  *
  * Trainers cannot edit working days or lesson slots — only the manager can.
+ *
+ * Week 14 refactor:
+ *  - The three GET endpoints that previously wrote a raw Trainer entity into
+ *    the model now write a TrainerDTO instead. The BCrypt password hash,
+ *    failedAttempts counter, and isLocked flag carried by the entity can no
+ *    longer surface in any Thymeleaf template, even by accident.
+ *  - currentTrainer() is kept as a null-returning guard rather than an
+ *    exception-throwing variant. Trainer flows are short and infrequent, and
+ *    the redirect-on-null pattern is already consistent across the file —
+ *    no duplication worth removing here.
  */
 @Controller
 @RequestMapping("/trainer")
@@ -156,7 +166,8 @@ public class TrainerController {
                 .sorted(Comparator.comparing(PersonalTrainingAppointment::getStartTime))
                 .toList();
 
-        model.addAttribute("trainer", trainer);
+        // DTO instead of the raw entity — see class-level note.
+        model.addAttribute("trainer", DtoMapper.toTrainerDTO(trainer));
         model.addAttribute("week", week);
         model.addAttribute("today", today);
         model.addAttribute("monday", monday);
@@ -258,7 +269,8 @@ public class TrainerController {
             ));
         }
 
-        model.addAttribute("trainer", trainer);
+        // DTO instead of the raw entity — see class-level note.
+        model.addAttribute("trainer", DtoMapper.toTrainerDTO(trainer));
         model.addAttribute("rows", rows);
         model.addAttribute("filter", filter);
         model.addAttribute("statusFilter", fStatus);
@@ -323,6 +335,7 @@ public class TrainerController {
         }
         return "redirect:/trainer/appointments";
     }
+
     /** Trainer cancels an upcoming appointment — member will see this in their PT page. */
     @PostMapping("/appointments/{id}/cancel")
     public String cancelAppointment(@org.springframework.web.bind.annotation.PathVariable int id,
@@ -345,7 +358,8 @@ public class TrainerController {
     public String profile(HttpSession session, Model model) {
         Trainer trainer = currentTrainer(session);
         if (trainer == null) return "redirect:/login";
-        model.addAttribute("trainer", trainer);
+        // DTO instead of the raw entity — see class-level note.
+        model.addAttribute("trainer", DtoMapper.toTrainerDTO(trainer));
         return "trainer/profile";
     }
 
