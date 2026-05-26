@@ -114,7 +114,8 @@ public class ManagerController {
                     m.getEmail() != null ? m.getEmail() : "",
                     m.getStatus(),
                     "NONE".equals(memberTier) ? "-" : memberTier,
-                    m.getCreatedAt() != null ? m.getCreatedAt().toLocalDate().toString() : "-"
+                    m.getCreatedAt() != null ? m.getCreatedAt().toLocalDate().toString() : "-",
+                    m.isLocked()
             ));
         }
         model.addAttribute("members", rows);
@@ -163,7 +164,8 @@ public class ManagerController {
 
     // View-model used by the members table.
     public record MemberRow(int id, String name, String phone, String email,
-                            String status, String tier, String createdDate) {}
+                            String status, String tier, String createdDate,
+                            boolean locked) {}
 // ========================================================================
     // Add Member tab — Manager registers a member directly with cash payment.
     // ANNUAL_INSTALLMENT is intentionally NOT offered here (it requires the

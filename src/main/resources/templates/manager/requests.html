@@ -204,10 +204,7 @@
                 </form>
                 <form th:if="${r.status == 'PENDING'}" class="inline-form" method="post"
                       th:action="@{|/manager/requests/registration/${r.id}/reject|}"
-                      th:with="msg=${r.type == 'RENEWAL'
-                                    ? 'Reject this renewal request? The member''s current membership stays active.'
-                                    : 'Reject this registration? The member account will be permanently deleted.'}"
-                      th:onsubmit="'return confirm(\'' + ${msg} + '\');'">
+                      onsubmit="return confirm('Reject this request? If it is a new registration the member account will be permanently deleted. If it is a renewal the existing membership stays active.');">
                     <button type="submit" class="btn btn-reject">Reject</button>
                 </form>
                 <span th:if="${r.status != 'PENDING'}" style="color:#6e6e73; font-size:11px;">—</span>

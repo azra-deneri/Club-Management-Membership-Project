@@ -25,10 +25,15 @@
         button:hover { background: #0077ed; }
         .footer { margin-top: 16px; text-align: center; font-size: 13px; }
         .footer a { color: #0071e3; text-decoration: none; }
-        .error {
+      .error {
             margin-top: 16px; padding: 10px 12px;
             background: #fff2f0; border: 1px solid #ffccc7;
             color: #cf1322; border-radius: 6px; font-size: 13px;
+        }
+        .success {
+            margin-top: 16px; padding: 10px 12px;
+            background: #f6ffed; border: 1px solid #b7eb8f;
+            color: #135200; border-radius: 6px; font-size: 13px;
         }
     </style>
 </head>
@@ -36,7 +41,8 @@
 <div class="container">
     <h1>ISC-MS Login</h1>
 
-    <div class="error" th:if="${error}" th:text="${error}"></div>
+    <div class="error"   th:if="${error}"   th:text="${error}"></div>
+    <div class="success" th:if="${success}" th:text="${success}"></div>
 
     <form th:action="@{/login}" method="post">
         <label>Role</label>

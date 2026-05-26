@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register — ISC-MS</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .layout {
+            max-width: 1080px; margin: 32px auto; padding: 0 16px;
+            display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px;
+        }
+        @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+
+        .card {
+            background: white; border-radius: 12px; padding: 28px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        h1 { margin: 0 0 4px; color: #21578d; font-size: 22px; }
+        h2 { color: #21578d; font-size: 16px; margin: 0 0 12px;
+             text-transform: uppercase; letter-spacing: 0.4px; }
+        .subtitle { color: #6e6e73; font-size: 13px; margin-bottom: 22px; }
+
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-error { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+
+        .field { margin-bottom: 13px; }
+        .field label {
+            display: block; font-size: 11px; color: #6e6e73;
+            margin-bottom: 4px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .field input, .field select {
+            width: 100%; padding: 9px 11px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            box-sizing: border-box; font-family: inherit; background: white;
+        }
+        .field input:focus, .field select:focus { outline: none; border-color: #0071e3; }
+        .required { color: #cf1322; }
+        .hint { font-size: 11px; color: #6e6e73; margin-top: 4px; }
+
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        .payment-box {
+            background: #fafafa; border: 1px solid #ececec;
+            border-radius: 8px; padding: 14px; margin: 14px 0;
+        }
+        .payment-row {
+            display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+            font-size: 14px; margin-bottom: 6px;
+        }
+        .payment-row label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+        .amount {
+            font-size: 18px; font-weight: 700; color: #21578d;
+            margin-top: 8px;
+        }
+        .amount-note { font-size: 12px; color: #6e6e73; font-weight: 400; }
+
+        .actions { margin-top: 18px; }
+        .btn {
+            display: block; width: 100%; padding: 12px 22px;
+            font-size: 15px; font-weight: 500;
+            border-radius: 6px; border: none; cursor: pointer;
+            text-decoration: none; text-align: center;
+            background: #21578d; color: white; box-sizing: border-box;
+        }
+        .back-link {
+            display: block; text-align: center; margin-top: 14px;
+            font-size: 13px; color: #6e6e73; text-decoration: none;
+        }
+
+        /* Tier benefits panel */
+        .tier-tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+        .tier-tab {
+            flex: 1; padding: 8px 6px; font-size: 12px; font-weight: 600;
+            background: #f5f5f7; color: #6e6e73; border: none;
+            border-radius: 6px; cursor: pointer; text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .tier-tab.active { background: #21578d; color: white; }
+        .tier-content { display: none; }
+        .tier-content.active { display: block; }
+        .benefit-list { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+        .benefit-list li {
+            padding: 7px 0; border-bottom: 1px solid #f0f0f0;
+            color: #1d1d1f;
+        }
+        .benefit-list li::before { content: "✓ "; color: #135200; font-weight: 700; }
+        .price-tag {
+            background: #fafafa; padding: 10px 12px; border-radius: 6px;
+            font-size: 12px; color: #6e6e73; margin-top: 10px;
+        }
+        .price-tag b { color: #1d1d1f; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <!-- LEFT: registration form -->
+    <div class="card">
+        <h1>Create your account</h1>
+        <p class="subtitle">Join Istanbul Sports Club — fill in your details, choose a plan and a payment method.</p>
+
+        <div class="alert alert-error" th:if="${error}" th:text="${error}"></div>
+
+        <form method="post" th:action="@{/register}" id="registerForm">
+
+            <h2>Personal information</h2>
+            <div class="field">
+                <label>Full Name <span class="required">*</span></label>
+                <input type="text" name="fullName" th:value="${fullName}" required maxlength="100"/>
+            </div>
+
+            <div class="row">
+                <div class="field">
+                    <label>Date of Birth <span class="required">*</span></label>
+                    <input type="date" name="dob" th:value="${dob}" required/>
+                </div>
+                <div class="field">
+                    <label>Gender <span class="required">*</span></label>
+                    <select name="gender">
+                        <option value="MALE"   th:selected="${gender == 'MALE'}">Male</option>
+                        <option value="FEMALE" th:selected="${gender == 'FEMALE'}">Female</option>
+                        <option value="OTHER"  th:selected="${gender == 'OTHER'}">Other</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="field">
+                    <label>Phone (10 digits) <span class="required">*</span></label>
+                    <input type="text" name="phone" th:value="${phone}" required
+                           pattern="\d{10}" maxlength="10"/>
+                </div>
+                <div class="field">
+                    <label>Email <span class="required">*</span></label>
+                    <input type="email" name="email" th:value="${email}" required maxlength="100"/>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="field">
+                    <label>Password <span class="required">*</span></label>
+                    <input type="password" name="password" required minlength="8" maxlength="100"
+                           autocomplete="new-password"/>
+                    <div class="hint">Minimum 8 characters.</div>
+                </div>
+                <div class="field">
+                    <label>Confirm Password <span class="required">*</span></label>
+                    <input type="password" name="confirmPassword" required minlength="8" maxlength="100"
+                           autocomplete="new-password"/>
+                </div>
+            </div>
+
+            <h2 style="margin-top:18px;">Health (optional)</h2>
+            <div class="row">
+                <div class="field">
+                    <label>Weight (kg)</label>
+                    <input type="number" name="weight" th:value="${weight}" step="0.1" min="20" max="300"/>
+                </div>
+                <div class="field">
+                    <label>Height (cm)</label>
+                    <input type="number" name="height" th:value="${height}" step="0.1" min="80" max="250"/>
+                </div>
+            </div>
+
+            <h2 style="margin-top:18px;">Emergency contact (optional)</h2>
+            <div class="row">
+                <div class="field">
+                    <label>Contact Name</label>
+                    <input type="text" name="emergencyContactName" th:value="${emergencyContactName}" maxlength="100"/>
+                </div>
+                <div class="field">
+                    <label>Contact Phone</label>
+                    <input type="text" name="emergencyContactPhone" th:value="${emergencyContactPhone}" maxlength="20"/>
+                </div>
+            </div>
+
+            <h2 style="margin-top:18px;">Membership &amp; payment</h2>
+            <div class="row">
+                <div class="field">
+                    <label>Tier <span class="required">*</span></label>
+                    <select name="tier" id="tier" onchange="updateAmount(); switchTier(this.value);">
+                        <option value="CLASSIC" th:selected="${tier == 'CLASSIC'}">Classic</option>
+                        <option value="GOLD"    th:selected="${tier == 'GOLD'}">Gold</option>
+                        <option value="VIP"     th:selected="${tier == 'VIP'}">VIP</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Package <span class="required">*</span></label>
+                    <select name="packageType" id="packageType" onchange="updateAmount();">
+                        <option value="MONTHLY"            th:selected="${packageType == 'MONTHLY'}">Monthly</option>
+                        <option value="ANNUAL_PREPAID"     th:selected="${packageType == 'ANNUAL_PREPAID'}">Annual prepaid (15% off)</option>
+                        <option value="ANNUAL_INSTALLMENT" th:selected="${packageType == 'ANNUAL_INSTALLMENT'}"
+                                id="optInstallment">Annual installment (+7%)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="payment-box">
+                <div style="font-weight:600; font-size:12px; color:#6e6e73;
+                            text-transform:uppercase; letter-spacing:0.4px; margin-bottom:8px;">
+                    Payment method
+                </div>
+                <div class="payment-row">
+                    <label>
+                        <input type="radio" name="paymentMethod" value="CASH"
+                               th:checked="${paymentMethod == 'CASH'}" onchange="refreshPackages();"/>
+                        Cash (pay at the club)
+                    </label>
+                    <label>
+                        <input type="radio" name="paymentMethod" value="ONLINE"
+                               th:checked="${paymentMethod == 'ONLINE'}" onchange="refreshPackages();"/>
+                        Online (pay by card now)
+                    </label>
+                </div>
+                <div class="hint">
+                    Cash requires manager approval (up to 3 days). Online activates your account immediately.
+                </div>
+                <div class="amount" id="amountLabel">Amount: —</div>
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="btn">Submit Registration</button>
+            </div>
+
+            <a th:href="@{/login}" class="back-link">← Back to Login</a>
+        </form>
+    </div>
+
+    <!-- RIGHT: tier benefits panel -->
+    <div class="card">
+        <h1 style="font-size:18px;">Tier benefits</h1>
+        <p class="subtitle">Compare what each tier includes.</p>
+
+        <div class="tier-tabs">
+            <button type="button" class="tier-tab" data-tier="CLASSIC" onclick="switchTier('CLASSIC')">Classic</button>
+            <button type="button" class="tier-tab" data-tier="GOLD"    onclick="switchTier('GOLD')">Gold</button>
+            <button type="button" class="tier-tab" data-tier="VIP"     onclick="switchTier('VIP')">VIP</button>
+        </div>
+
+        <div class="tier-content" data-tier="CLASSIC">
+            <ul class="benefit-list">
+                <li>Full gym access</li>
+                <li>Locker room access</li>
+                <li>Group fitness classes</li>
+                <li>Basic equipment usage</li>
+            </ul>
+            <div class="price-tag">Base price: <b>750 TL / month</b></div>
+        </div>
+
+        <div class="tier-content" data-tier="GOLD">
+            <ul class="benefit-list">
+                <li>Everything in Classic</li>
+                <li>Pool access</li>
+                <li>Sauna &amp; steam room</li>
+                <li>1 free personal-training session / month</li>
+            </ul>
+            <div class="price-tag">Base price: <b>1250 TL / month</b></div>
+        </div>
+
+        <div class="tier-content" data-tier="VIP">
+            <ul class="benefit-list">
+                <li>Everything in Gold</li>
+                <li>Unlimited personal-training sessions</li>
+                <li>Priority class booking</li>
+                <li>Guest pass (2 / month)</li>
+                <li>Nutritionist consultation</li>
+            </ul>
+            <div class="price-tag">Base price: <b>2000 TL / month</b></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tier base prices — must match TierPolicyRegistry on the server side.
+    var BASE_PRICE = { CLASSIC: 750, GOLD: 1250, VIP: 2000 };
+
+    // Package multipliers — must match PackageStrategyRegistry on the server side.
+    // MONTHLY = base; ANNUAL_PREPAID = base * 12 * 0.85; ANNUAL_INSTALLMENT = base * 1.07
+    function packageNote(pkg) {
+        if (pkg === 'ANNUAL_PREPAID')     return ' total (15% off)';
+        if (pkg === 'ANNUAL_INSTALLMENT') return ' / month (+7%)';
+        return ' / month';
+    }
+    function packageAmount(tier, pkg) {
+        var base = BASE_PRICE[tier] || 750;
+        if (pkg === 'ANNUAL_PREPAID')     return Math.round(base * 12 * 0.85 * 100) / 100;
+        if (pkg === 'ANNUAL_INSTALLMENT') return Math.round(base * 1.07 * 100) / 100;
+        return base;
+    }
+
+    function updateAmount() {
+        var tier = document.getElementById('tier').value;
+        var pkg  = document.getElementById('packageType').value;
+        var amt  = packageAmount(tier, pkg);
+        document.getElementById('amountLabel').innerHTML =
+            'Amount: ' + amt.toFixed(2) + ' TL' +
+            '<span class="amount-note">' + packageNote(pkg) + '</span>';
+    }
+
+    // Cash flow doesn't allow ANNUAL_INSTALLMENT — hide that option.
+    function refreshPackages() {
+        var method  = document.querySelector('input[name="paymentMethod"]:checked').value;
+        var pkgSel  = document.getElementById('packageType');
+        var instOpt = document.getElementById('optInstallment');
+        if (method === 'CASH') {
+            if (pkgSel.value === 'ANNUAL_INSTALLMENT') pkgSel.value = 'MONTHLY';
+            instOpt.disabled = true;
+            instOpt.hidden   = true;
+        } else {
+            instOpt.disabled = false;
+            instOpt.hidden   = false;
+        }
+        updateAmount();
+    }
+
+    // Tier benefits panel — switches active tab and content.
+    function switchTier(tier) {
+        document.querySelectorAll('.tier-tab').forEach(function(t) {
+            t.classList.toggle('active', t.dataset.tier === tier);
+        });
+        document.querySelectorAll('.tier-content').forEach(function(c) {
+            c.classList.toggle('active', c.dataset.tier === tier);
+        });
+    }
+
+    // Initialize on load.
+    refreshPackages();
+    switchTier(document.getElementById('tier').value);
+</script>
+</body>
+</html>

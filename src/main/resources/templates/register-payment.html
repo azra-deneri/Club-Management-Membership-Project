@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment — ISC-MS</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
+        .container {
+            max-width: 480px; margin: 32px auto; padding: 28px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        h1 { margin: 0 0 4px; color: #21578d; font-size: 22px; }
+        .subtitle { color: #6e6e73; font-size: 13px; margin-bottom: 22px; }
+        .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+        .alert-error { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+
+        .summary {
+            background: #fafafa; border: 1px solid #ececec; border-radius: 8px;
+            padding: 14px 16px; margin-bottom: 22px; font-size: 14px;
+        }
+        .summary-row { display: flex; justify-content: space-between; padding: 4px 0; }
+        .summary-row b { color: #21578d; }
+        .summary-total { border-top: 1px solid #ececec; margin-top: 6px;
+                         padding-top: 8px; font-size: 16px; font-weight: 600; }
+
+        .field { margin-bottom: 13px; }
+        .field label {
+            display: block; font-size: 11px; color: #6e6e73;
+            margin-bottom: 4px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .field input {
+            width: 100%; padding: 9px 11px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 6px;
+            box-sizing: border-box; font-family: inherit; letter-spacing: 0.5px;
+        }
+        .field input:focus { outline: none; border-color: #0071e3; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        .actions { margin-top: 18px; display: flex; gap: 10px; }
+        .btn {
+            flex: 1; padding: 12px 22px; font-size: 15px; font-weight: 500;
+            border-radius: 6px; border: none; cursor: pointer;
+            text-align: center; box-sizing: border-box;
+        }
+        .btn-primary { background: #21578d; color: white; }
+        .btn-secondary {
+            background: white; color: #6e6e73; border: 1px solid #d2d2d7;
+        }
+
+        .test-cards {
+            margin-top: 22px; padding: 12px 14px; background: #f6f8fa;
+            border: 1px solid #ececec; border-radius: 6px;
+            font-size: 12px; color: #6e6e73;
+        }
+        .test-cards b { color: #1d1d1f; display: block; margin-bottom: 6px; }
+        .test-cards code {
+            background: white; padding: 1px 6px; border-radius: 3px;
+            font-size: 11px; border: 1px solid #ececec;
+        }
+        .test-cards .row-line { padding: 3px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Online payment</h1>
+    <p class="subtitle">Enter your card details to activate your membership immediately.</p>
+
+    <div class="alert alert-error" th:if="${error}" th:text="${error}"></div>
+
+    <div class="summary">
+        <div class="summary-row">
+            <span>Tier</span>
+            <b th:text="${tier}">CLASSIC</b>
+        </div>
+        <div class="summary-row">
+            <span>Package</span>
+            <b th:text="${packageType}">MONTHLY</b>
+        </div>
+        <div class="summary-row summary-total">
+            <span>Amount due</span>
+            <b><span th:text="${#numbers.formatDecimal(amount, 1, 2)}">0.00</span> TL</b>
+        </div>
+    </div>
+
+    <form method="post" th:action="@{/register/payment}" id="paymentForm" autocomplete="off">
+        <div class="field">
+            <label>Card Number</label>
+            <input type="text" name="cardNumber" maxlength="19"
+                   placeholder="1234 5678 9012 3456"
+                   oninput="formatCardNumber(this)" required/>
+        </div>
+        <div class="field">
+            <label>Cardholder Name</label>
+            <input type="text" name="cardName" maxlength="60"
+                   placeholder="FULL NAME ON CARD" required/>
+        </div>
+        <div class="row">
+            <div class="field">
+                <label>Expiry</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <select name="expiryMonth" required style="padding:9px 11px; font-size:14px;
+                            border:1px solid #d2d2d7; border-radius:6px; box-sizing:border-box;
+                            background:white; font-family:inherit;">
+                        <option value="" disabled selected>MM</option>
+                        <option th:each="m : ${months}" th:value="${m}" th:text="${m}">01</option>
+                    </select>
+                    <select name="expiryYear" required style="padding:9px 11px; font-size:14px;
+                            border:1px solid #d2d2d7; border-radius:6px; box-sizing:border-box;
+                            background:white; font-family:inherit;">
+                        <option value="" disabled selected>YYYY</option>
+                        <option th:each="y : ${years}" th:value="${y}" th:text="${y}">2026</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label>CVV</label>
+                <input type="text" name="cvv" maxlength="3"
+                       placeholder="123"
+                       oninput="this.value=this.value.replace(/\D/g,'').slice(0,3);" required/>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">
+                Pay <span th:text="${#numbers.formatDecimal(amount, 1, 2)}">0.00</span> TL
+            </button>
+        </div>
+    </form>
+
+    <form method="post" th:action="@{/register/payment/cancel}">
+        <button type="submit" class="btn btn-secondary" style="width:100%; margin-top:10px;">
+            Cancel
+        </button>
+    </form>
+
+    <div class="test-cards">
+        <b>Test cards (demo)</b>
+        <div class="row-line">✓ Success: <code>4242 4242 4242 4242</code></div>
+        <div class="row-line">✗ Insufficient funds: <code>4000 0000 0000 0002</code></div>
+        <div class="row-line">✗ Expired card: <code>4000 0000 0000 0069</code></div>
+        <div class="row-line">✗ Invalid CVV: <code>4000 0000 0000 0127</code></div>
+        <div class="row-line" style="margin-top:6px;">
+            Any future expiry (e.g. <code>12</code> / <code>2030</code>) and any 3-digit CVV.
+        </div>
+    </div>
+</div>
+
+<script>
+    // Inserts a space every 4 digits as the user types.
+    function formatCardNumber(input) {
+        var digits = input.value.replace(/\D/g, '').slice(0, 16);
+        var grouped = digits.match(/.{1,4}/g);
+        input.value = grouped ? grouped.join(' ') : '';
+    }
+</script>
+</body>
+</html>

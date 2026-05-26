@@ -5,53 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="06cc4173-bd97-4bab-bc48-a91a6eb413dc" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/IscmsApplication.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/AdminController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/BMIController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/EventController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/HomeController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/PTController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/TrainerController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/application.properties" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/dashboard.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/manager-form.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/managers.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/payments.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/profile.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/login.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/add-member.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/appointments.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/event-detail.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/events.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/members.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/profile.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/reports.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/trainer-form.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/trainer-lesson-slots.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/trainer-working-days.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/trainers.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/member/bmi.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/member/events.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/member/pt.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/member/renew.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/trainer/appointments.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/trainer/dashboard.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/trainer/profile.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/dao/MembershipDAO.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/dao/MembershipDAO.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/dao/MembershipDAOImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/dao/MembershipDAOImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/AuthService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/AuthService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/ManagerService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/ManagerService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ForgotPasswordController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/RegisterController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/forgot-password.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/register-payment.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/register.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/MemberService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/MemberService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/PTService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/PTService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/ReportService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/ReportService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/HelloServlet.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/webapp/WEB-INF/web.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/webapp/index.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/iscms/AuthServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/iscms/AuthServiceTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/iscms/MemberServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/iscms/MemberServiceTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/iscms/PTServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/iscms/PTServiceTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/templates/login.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/templates/login.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/templates/manager/members.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/members.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/templates/manager/requests.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/requests.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -224,7 +188,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java</url>
-          <line>1123</line>
+          <line>1125</line>
           <properties>
             <option name="lambda-ordinal" value="-1" />
           </properties>

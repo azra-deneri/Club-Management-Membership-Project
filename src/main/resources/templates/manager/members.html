@@ -78,6 +78,7 @@
         .pill-FROZEN        { background: #e6f7ff; color: #0050b3; }
         .pill-SUSPENDED     { background: #fff2f0; color: #cf1322; }
         .pill-PENDING       { background: #fff7e6; color: #874d00; }
+        .pill-LOCKED        { background: #fff1f0; color: #a8071a; }
 
         .row-count {
             font-size: 12px; color: #6e6e73; margin-left: auto;
@@ -146,6 +147,7 @@
             <td th:text="${m.email}">fatma@example.com</td>
             <td>
                 <span class="pill" th:classappend="'pill-' + ${m.status}" th:text="${m.status}">ACTIVE</span>
+                <span class="pill pill-LOCKED" th:if="${m.locked}" style="margin-left:4px;">LOCKED</span>
             </td>
             <td th:text="${m.tier}">GOLD</td>
             <td th:text="${m.createdDate}">2026-02-04</td>
@@ -158,7 +160,7 @@
                         Suspend
                     </button>
                 </form>
-                <form class="inline-form" method="post"
+                <form class="inline-form" method="post" th:if="${m.locked}"
                       th:action="@{|/manager/members/${m.id}/unlock|}">
                     <button type="submit" class="btn btn-warning btn-small">
                         Unlock

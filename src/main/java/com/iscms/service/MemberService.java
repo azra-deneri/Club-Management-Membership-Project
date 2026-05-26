@@ -515,10 +515,15 @@ public class MemberService {
         if (ms.getEndDate().minusDays(3).isBefore(LocalDate.now()))
             throw new IllegalStateException("Cannot freeze within 3 days of expiry.");
 
+        LocalDate today = LocalDate.now();
+        LocalDate freezeEnd = today.plusDays(days);
         LocalDate newEnd = ms.getEndDate().plusDays(days);
+
         membershipDAO.updateEndDate(membershipId, newEnd);
         membershipDAO.updateStatus(membershipId, "FROZEN");
         membershipDAO.incrementFreezeCount(membershipId);
+        // Persist the freeze window so partial-unfreeze can refund unused days.
+        membershipDAO.insertFreezeLog(membershipId, today, freezeEnd);
         memberDAO.updateStatus(ms.getMemberId(), "FROZEN");
     }
 
@@ -610,6 +615,8 @@ public class MemberService {
             throw new IllegalArgumentException("Date of birth is required.");
         if (member.getPhone() == null || member.getPhone().isBlank())
             throw new IllegalArgumentException("Phone number is required.");
+        if (!member.getPhone().matches("\\d{10}"))
+            throw new IllegalArgumentException("Phone must be exactly 10 digits.");
         if (member.getDateOfBirth().isAfter(LocalDate.now().minusYears(18)))
             throw new IllegalArgumentException("Minimum age is 18.");
         if (memberDAO.existsByPhone(member.getPhone()))
