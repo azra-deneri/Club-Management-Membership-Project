@@ -3,86 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel — ISC-MS</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
-        .container {
-            max-width: 1100px; margin: 32px auto; padding: 28px;
-            background: white; border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        }
-        .header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
-        }
-        h1 { margin: 0; color: #1d1d1f; font-size: 26px; }
-        .role-pill {
-            background: #3c1e64; color: white; padding: 4px 12px;
-            border-radius: 999px; font-size: 11px; font-weight: 600;
-            text-transform: uppercase; letter-spacing: 0.5px;
-            margin-left: 8px; vertical-align: middle;
-        }
-        .top-link {
-            padding: 8px 16px; background: #f5f5f7; color: #1d1d1f;
-            text-decoration: none; border-radius: 6px; font-size: 13px;
-        }
-        .tile-grid {
-            display: grid; gap: 14px;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            margin-top: 12px;
-        }
-        .tile {
-            display: block; padding: 18px 20px;
-            background: #3c1e64; color: white;
-            text-decoration: none; border-radius: 10px;
-            font-weight: 600; font-size: 15px;
-            transition: transform 0.1s ease, background 0.15s ease;
-        }
-        .tile:hover { background: #4d2880; transform: translateY(-1px); }
-        .tile .sub {
-            display: block; margin-top: 4px;
-            font-size: 12px; font-weight: 400; opacity: 0.85;
-        }
-        .filler {
-            margin-top: 18px; padding: 18px;
-            background: #fafafa; border-radius: 8px;
-            color: #6e6e73; font-size: 13px;
-        }
-    </style>
+    <title>Admin Panel — Istanbul Sports Club</title>
+    <link rel="stylesheet" th:href="@{/css/iscms.css}"/>
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>
+
+<!-- TOP BRANDING BAR -->
+<header class="gym-topbar">
+    <a th:href="@{/admin/dashboard}" class="gym-brand">
+        <span class="gym-brand-mark">🏋️</span>
+        ISTANBUL <span class="gym-brand-accent">SPORTS</span> CLUB
+    </a>
+    <div class="gym-topbar-right">
+        <a th:href="@{/logout}" class="gym-signout">Sign Out</a>
+    </div>
+</header>
+
+<div class="gym-wrap">
+
+    <!-- WELCOME CARD -->
+    <section class="welcome-card">
+        <div class="welcome-greeting">Admin Console</div>
+        <h1 class="welcome-name">
             Welcome, <span th:text="${admin.fullName}">Admin</span>
-            <span class="role-pill">ADMIN</span>
         </h1>
-        <a th:href="@{/logout}" class="top-link">Sign Out</a>
-    </div>
+        <div class="welcome-meta">
+            <span class="gym-pill gym-pill-role">ADMIN</span>
+        </div>
+    </section>
 
-    <div class="tile-grid">
-        <a th:href="@{/admin/managers}" class="tile">
-            Managers
-            <span class="sub">List, lock/unlock, and delete</span>
-        </a>
-        <a th:href="@{/admin/managers/new}" class="tile">
-            Add Manager
-            <span class="sub">Create a new account</span>
-        </a>
-        <a th:href="@{/admin/payments}" class="tile">
-            All Payments
-            <span class="sub">System-wide payment history</span>
-        </a>
-        <a th:href="@{/admin/profile}" class="tile">
-            My Profile
-            <span class="sub">Change password</span>
-        </a>
-    </div>
+    <!-- ADMIN ACTIONS -->
+    <section class="gym-nav-card">
+        <div class="gym-nav-title">Admin-only actions</div>
+        <div class="gym-nav-grid">
+            <a th:href="@{/admin/managers}" class="gym-nav-tile">
+                <span class="gym-nav-icon">👥</span> Managers
+            </a>
+            <a th:href="@{/admin/managers/new}" class="gym-nav-tile">
+                <span class="gym-nav-icon">➕</span> Add Manager
+            </a>
+            <a th:href="@{/admin/payments}" class="gym-nav-tile">
+                <span class="gym-nav-icon">💳</span> All Payments
+            </a>
+            <a th:href="@{/admin/profile}" class="gym-nav-tile">
+                <span class="gym-nav-icon">👤</span> My Profile
+            </a>
+        </div>
+    </section>
 
-    <div class="filler">
-        Admin-only actions. Operational tasks (members, events, trainers, reports)
-        belong to the Manager dashboard and are not available here by design.
-    </div>
+
 </div>
 </body>
 </html>

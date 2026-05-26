@@ -2,156 +2,181 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>ISC-MS — Dashboard</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
-        .container {
-            max-width: 800px; margin: 40px auto; padding: 32px;
-            background: white; border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        }
-        h1 { margin-top: 0; color: #1d1d1f; }
-        .role-badge {
-            display: inline-block; padding: 4px 12px;
-            background: #0071e3; color: white;
-            border-radius: 12px; font-size: 12px; font-weight: 500;
-            margin-left: 8px;
-        }
-        .frozen-badge {
-            display: inline-block; padding: 4px 12px;
-            background: #1890ff; color: white;
-            border-radius: 12px; font-size: 12px; font-weight: 500;
-            margin-left: 8px;
-        }
-        .passive-badge {
-            display: inline-block; padding: 4px 12px;
-            background: #dc2626; color: white;
-            border-radius: 12px; font-size: 12px; font-weight: 500;
-            margin-left: 8px;
-        }
-        .logout {
-            float: right; padding: 8px 16px;
-            background: #f5f5f7; color: #1d1d1f;
-            text-decoration: none; border-radius: 6px;
-            font-size: 13px;
-        }
-        .links { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 12px; }
-        .links a {
-            padding: 12px 18px; background: #0071e3; color: white;
-            text-decoration: none; border-radius: 6px; font-size: 14px;
-        }
-        .links a:hover { background: #0077ed; }
-        .placeholder {
-            margin-top: 24px; padding: 20px;
-            background: #f9f9fb; border-radius: 8px;
-            color: #6e6e73; font-size: 13px;
-        }
-        .frozen-notice {
-            margin-top: 16px; padding: 14px 16px;
-            background: #e6f7ff; border: 1px solid #91d5ff;
-            color: #0050b3; border-radius: 8px; font-size: 13px;
-        }
-        .passive-notice {
-            margin-top: 16px; padding: 14px 16px;
-            background: #fee2e2; border: 1px solid #fca5a5;
-            color: #991b1b; border-radius: 8px; font-size: 13px;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — Istanbul Sports Club</title>
+    <link rel="stylesheet" th:href="@{/css/iscms.css}"/>
 </head>
 <body>
-<div class="container">
-    <a th:href="@{/logout}" class="logout">Sign Out</a>
-    <h1>
-        Welcome, <span th:text="${displayName}">User</span>
-        <span class="role-badge" th:text="${role}">ROLE</span>
-        <span class="frozen-badge" th:if="${isFrozen}">FROZEN</span>
-        <span class="passive-badge" th:if="${isPaymentDeactivated}">DEACTIVATED</span>
-    </h1>
 
-    <div class="frozen-notice" th:if="${isFrozen}">
-        Your membership is currently frozen. Other features are unavailable
-        until you unfreeze it from the Membership page.
+<!-- TOP BRANDING BAR -->
+<header class="gym-topbar">
+    <a th:href="@{/dashboard}" class="gym-brand">
+        <span class="gym-brand-mark">🏋️</span>
+        ISTANBUL <span class="gym-brand-accent">SPORTS</span> CLUB
+    </a>
+    <div class="gym-topbar-right">
+        <a th:href="@{/logout}" class="gym-signout">Sign Out</a>
     </div>
+</header>
 
-    <!-- PAYMENT_HOLD warning: 3+ overdue installments. Member retains
-         membership but has restricted access until they clear the debt. -->
-    <div class="payment-hold-banner" th:if="${paymentHold}"
-         style="background:#fff2f0; border:2px solid #cf1322; color:#820014;
-                border-radius:10px; padding:16px 20px; margin-bottom:20px;
-                display:flex; align-items:center; justify-content:space-between;
-                gap:16px; flex-wrap:wrap;">
-        <div style="flex:1; min-width:240px;">
-            <div style="font-size:16px; font-weight:700; margin-bottom:4px;">
-                ⚠ Account on Payment Hold
-            </div>
-            <div style="font-size:13px; line-height:1.5;">
-                You have <strong th:text="${overdueCount}">3</strong> overdue
-                installment(s). Most features are restricted until you clear your debt.
-            </div>
+<div class="gym-wrap">
+
+    <!-- WELCOME CARD -->
+    <section class="welcome-card">
+        <div class="welcome-greeting" th:text="${greeting}">Good morning</div>
+        <h1 class="welcome-name" th:text="${displayName}">Athlete</h1>
+        <div class="welcome-meta">
+            <span class="gym-pill gym-pill-role" th:text="${role}">MEMBER</span>
+
+            <!-- Membership status pill (member only, when there's an active membership) -->
+            <span th:if="${role == 'MEMBER' and memberMembershipStatus != null}"
+                  class="gym-pill"
+                  th:classappend="'gym-pill-status-' + ${#strings.toLowerCase(memberMembershipStatus)}"
+                  th:text="${memberMembershipStatus}">ACTIVE</span>
+
+            <span class="gym-pill gym-pill-status-payment_hold" th:if="${paymentHold}">PAYMENT HOLD</span>
+            <span class="gym-pill gym-pill-status-passive"      th:if="${isPaymentDeactivated}">DEACTIVATED</span>
         </div>
-        <a th:href="@{/member/installments}"
-           style="background:#cf1322; color:white; padding:10px 18px;
-                  border-radius:6px; text-decoration:none; font-weight:600;
-                  font-size:14px; white-space:nowrap;">
-            Pay Now →
-        </a>
+    </section>
+
+    <!-- QUICK STATS (role-specific) -->
+
+    <!-- Member quick stats -->
+    <div class="quick-stats" th:if="${role == 'MEMBER' and memberTier != null}">
+        <div class="quick-stat">
+            <div class="quick-stat-label">Active tier</div>
+            <div class="quick-stat-value" th:text="${memberTier}">GOLD</div>
+            <div class="quick-stat-sub">Your current plan</div>
+        </div>
+        <div class="quick-stat" th:if="${memberDaysLeft != null}">
+            <div class="quick-stat-label">Days remaining</div>
+            <div class="quick-stat-value" th:text="${memberDaysLeft}">120</div>
+            <div class="quick-stat-sub">Until membership end date</div>
+        </div>
+        <div class="quick-stat" th:if="${overdueCount &gt; 0}">
+            <div class="quick-stat-label">Overdue installments</div>
+            <div class="quick-stat-value" th:text="${overdueCount}">0</div>
+            <div class="quick-stat-sub">Pay to avoid restrictions</div>
+        </div>
     </div>
 
-    <div class="passive-notice" th:if="${isPaymentDeactivated}">
-        <strong>Account deactivated.</strong>
-        Your account is currently deactivated. To reactivate, go to
-        <strong>Installments</strong> and pay your oldest overdue installment.
+    <!-- Manager quick stats -->
+    <div class="quick-stats" th:if="${role == 'MANAGER'}">
+        <div class="quick-stat">
+            <div class="quick-stat-label">Pending requests</div>
+            <div class="quick-stat-value" th:text="${pendingRegistrations}">0</div>
+            <div class="quick-stat-sub">Awaiting your approval</div>
+        </div>
     </div>
 
-    <div class="links">
-        <!-- Member links visibility:
-             - FROZEN: only Membership
-             - PAYMENT-DEACTIVATED: only Installments
-             - PAYMENT_HOLD: only Installments (forced via banner)
-             - Normal ACTIVE: all -->
-        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
-           th:href="@{/member/profile}">My Profile</a>
-        <a th:if="${role == 'MEMBER' and !isPaymentDeactivated}"
-           th:href="@{/member/membership}">My Membership</a>
-        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
-           th:href="@{/member/payments}">Payment History</a>
-        <a th:if="${role == 'MEMBER' and !isFrozen and hasInstallments}"
-           th:href="@{/member/installments}">Installments</a>
-        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
-           th:href="@{/member/events}">Events</a>
-        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
-           th:href="@{/member/pt}">Personal Training</a>
-        <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
-           th:href="@{/member/bmi}">BMI Calculator</a>
+    <!-- ALERTS / BANNERS -->
 
-        <!-- Trainer links -->
-        <a th:if="${role == 'TRAINER'}"
-           th:href="@{/trainer/dashboard}">My Schedule</a>
-        <a th:if="${role == 'TRAINER'}"
-           th:href="@{/trainer/appointments}">My Appointments</a>
-        <a th:if="${role == 'TRAINER'}"
-           th:href="@{/trainer/profile}">My Profile</a>
-
-        <!-- Manager / Admin links -->
-        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
-           th:href="@{/manager/members}">Members</a>
-        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
-           th:href="@{/manager/add-member}">Add Member</a>
-        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
-           th:href="@{/manager/requests}">Requests</a>
-        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
-           th:href="@{/manager/events}">Events</a>
-        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
-           th:href="@{/manager/trainers}">Trainers &amp; PT</a>
-        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
-           th:href="@{/manager/reports}">Reports</a>
-        <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
-           th:href="@{/manager/profile}">My Profile</a>
+    <div class="gym-alert gym-alert-info" th:if="${isFrozen}">
+        <div style="flex:1;">
+            <strong>Your membership is currently frozen.</strong>
+            Other features are unavailable until you unfreeze it from the Membership page.
+        </div>
     </div>
 
-    <div class="placeholder" th:if="${!isFrozen and !isPaymentDeactivated}">
-        Additional dashboard panels will appear here as features are migrated from the desktop version.
+    <div class="gym-alert gym-alert-danger" th:if="${paymentHold}">
+        <div style="flex:1;">
+            <strong>⚠ Account on Payment Hold</strong><br>
+            You have <strong th:text="${overdueCount}">3</strong> overdue installment(s).
+            Most features are restricted until you clear your debt.
+        </div>
+        <a th:href="@{/member/installments}" class="gym-alert-action">Pay Now →</a>
     </div>
+
+    <div class="gym-alert gym-alert-danger" th:if="${isPaymentDeactivated}">
+        <div style="flex:1;">
+            <strong>Account deactivated.</strong>
+            Your account is currently deactivated. To reactivate, go to
+            <strong>Installments</strong> and pay your oldest overdue installment.
+        </div>
+    </div>
+
+    <!-- NAVIGATION TILES -->
+    <section class="gym-nav-card">
+        <div class="gym-nav-title">Quick navigation</div>
+        <div class="gym-nav-grid">
+
+            <!-- Member tiles -->
+            <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+               th:href="@{/member/profile}" class="gym-nav-tile">
+                <span class="gym-nav-icon">👤</span> My Profile
+            </a>
+            <a th:if="${role == 'MEMBER' and !isPaymentDeactivated}"
+               th:href="@{/member/membership}" class="gym-nav-tile">
+                <span class="gym-nav-icon">🎫</span> My Membership
+            </a>
+            <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+               th:href="@{/member/payments}" class="gym-nav-tile">
+                <span class="gym-nav-icon">💳</span> Payment History
+            </a>
+            <a th:if="${role == 'MEMBER' and !isFrozen and hasInstallments}"
+               th:href="@{/member/installments}" class="gym-nav-tile">
+                <span class="gym-nav-icon">📅</span> Installments
+            </a>
+            <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+               th:href="@{/member/events}" class="gym-nav-tile">
+                <span class="gym-nav-icon">🎉</span> Events
+            </a>
+            <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+               th:href="@{/member/pt}" class="gym-nav-tile">
+                <span class="gym-nav-icon">💪</span> Personal Training
+            </a>
+            <a th:if="${role == 'MEMBER' and !isFrozen and !isPaymentDeactivated}"
+               th:href="@{/member/bmi}" class="gym-nav-tile">
+                <span class="gym-nav-icon">⚖️</span> BMI Calculator
+            </a>
+
+            <!-- Trainer tiles -->
+            <a th:if="${role == 'TRAINER'}"
+               th:href="@{/trainer/dashboard}" class="gym-nav-tile">
+                <span class="gym-nav-icon">📆</span> My Schedule
+            </a>
+            <a th:if="${role == 'TRAINER'}"
+               th:href="@{/trainer/appointments}" class="gym-nav-tile">
+                <span class="gym-nav-icon">📋</span> My Appointments
+            </a>
+            <a th:if="${role == 'TRAINER'}"
+               th:href="@{/trainer/profile}" class="gym-nav-tile">
+                <span class="gym-nav-icon">👤</span> My Profile
+            </a>
+
+            <!-- Manager / Admin tiles -->
+            <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+               th:href="@{/manager/members}" class="gym-nav-tile">
+                <span class="gym-nav-icon">👥</span> Members
+            </a>
+            <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+               th:href="@{/manager/add-member}" class="gym-nav-tile">
+                <span class="gym-nav-icon">➕</span> Add Member
+            </a>
+            <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+               th:href="@{/manager/requests}" class="gym-nav-tile">
+                <span class="gym-nav-icon">📨</span> Requests
+            </a>
+            <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+               th:href="@{/manager/events}" class="gym-nav-tile">
+                <span class="gym-nav-icon">🎉</span> Events
+            </a>
+            <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+               th:href="@{/manager/trainers}" class="gym-nav-tile">
+                <span class="gym-nav-icon">💪</span> Trainers &amp; PT
+            </a>
+            <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+               th:href="@{/manager/reports}" class="gym-nav-tile">
+                <span class="gym-nav-icon">📊</span> Reports
+            </a>
+            <a th:if="${role == 'MANAGER' or role == 'ADMIN'}"
+               th:href="@{/manager/profile}" class="gym-nav-tile">
+                <span class="gym-nav-icon">👤</span> My Profile
+            </a>
+
+        </div>
+    </section>
+
 </div>
 </body>
 </html>

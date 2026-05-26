@@ -2,104 +2,210 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>ISC-MS — Login</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; background: #f5f5f7; margin: 0; }
-        .container {
-            max-width: 400px; margin: 80px auto; padding: 32px;
-            background: white; border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        }
-        h1 { margin-top: 0; color: #1d1d1f; }
-        label { display: block; margin-top: 16px; font-weight: 500; }
-        input, select {
-            width: 100%; padding: 10px; margin-top: 4px;
-            border: 1px solid #d2d2d7; border-radius: 6px;
-            font-size: 14px; box-sizing: border-box;
-        }
-        button {
-            margin-top: 24px; width: 100%; padding: 12px;
-            background: #0071e3; color: white; border: none;
-            border-radius: 6px; font-size: 15px; cursor: pointer;
-        }
-        button:hover { background: #0077ed; }
-        .footer { margin-top: 16px; text-align: center; font-size: 13px; }
-        .footer a { color: #0071e3; text-decoration: none; }
-      .error {
-            margin-top: 16px; padding: 10px 12px;
-            background: #fff2f0; border: 1px solid #ffccc7;
-            color: #cf1322; border-radius: 6px; font-size: 13px;
-        }
-        .success {
-            margin-top: 16px; padding: 10px 12px;
-            background: #f6ffed; border: 1px solid #b7eb8f;
-            color: #135200; border-radius: 6px; font-size: 13px;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Istanbul Sports Club</title>
+    <link rel="stylesheet" th:href="@{/css/iscms.css}"/>
 </head>
-<body>
-<div class="container">
-    <h1>ISC-MS Login</h1>
+<body style="margin:0;">
 
-    <div class="error"   th:if="${error}"   th:text="${error}"></div>
-    <div class="success" th:if="${success}" th:text="${success}"></div>
-
-    <form th:action="@{/login}" method="post">
-        <label>Role</label>
-        <select name="role" id="roleSelect" onchange="updateIdentifierLabel()">
-            <option value="MEMBER"  th:selected="${role == 'MEMBER'  or role == null}">Member</option>
-            <option value="MANAGER" th:selected="${role == 'MANAGER'}">Manager</option>
-            <option value="TRAINER" th:selected="${role == 'TRAINER'}">Trainer</option>
-            <option value="ADMIN"   th:selected="${role == 'ADMIN'}">Admin</option>
-        </select>
-
-        <label id="identifierLabel">Phone</label>
-        <input type="text" name="identifier" id="identifierInput"
-               th:value="${identifier}" required />
-
-        <label>Password</label>
-        <input type="password" name="password" required />
-
-        <button type="submit">Sign In</button>
-    </form>
-
-    <div class="footer">
-        <a th:href="@{/register}">New Member Registration</a> •
-        <a th:href="@{/forgot-password}">Forgot Password</a>
+<!-- ===== STICKY TOP NAV ===== -->
+<nav class="landing-nav">
+    <a href="#home" class="landing-nav-brand">
+        ISTANBUL <span class="gym-brand-accent">SPORTS</span> CLUB
+    </a>
+    <div class="landing-nav-links">
+        <a href="#home">Home</a>
+        <a href="#about">About</a>
+        <a href="#membership">Membership</a>
+        <a href="#contact">Contact</a>
+        <a href="#signin" class="landing-nav-cta">Sign In</a>
     </div>
-</div>
+</nav>
+
+<!-- ===== HERO + LOGIN ===== -->
+<section class="landing-hero" id="home">
+    <div class="landing-hero-message">
+        <div class="landing-hero-eyebrow">Members Portal</div>
+        <h1 class="landing-hero-title">
+            TRAIN.<br>PROGRESS.<br><span class="accent">WIN.</span>
+        </h1>
+        <p class="landing-hero-sub">
+            Your journey to a stronger, healthier life starts here.
+            Sign in to manage your membership, book sessions and track your progress.
+        </p>
+    </div>
+
+    <div class="landing-hero-form" id="signin">
+        <h2 class="gym-login-heading" style="font-size:22px; margin-bottom:4px;">Welcome back</h2>
+        <p class="gym-login-subheading">Sign in to continue.</p>
+
+        <div class="gym-auth-error"   th:if="${error}"   th:text="${error}"></div>
+        <div class="gym-auth-success" th:if="${success}" th:text="${success}"></div>
+
+        <form th:action="@{/login}" method="post">
+            <div class="gym-auth-field">
+                <label>Role</label>
+                <select name="role" id="roleSelect" onchange="updateIdentifierLabel()">
+                    <option value="MEMBER"  th:selected="${role == 'MEMBER'  or role == null}">Member</option>
+                    <option value="MANAGER" th:selected="${role == 'MANAGER'}">Manager</option>
+                    <option value="TRAINER" th:selected="${role == 'TRAINER'}">Trainer</option>
+                    <option value="ADMIN"   th:selected="${role == 'ADMIN'}">Admin</option>
+                </select>
+            </div>
+            <div class="gym-auth-field">
+                <label id="identifierLabel">Phone</label>
+                <input type="text" name="identifier" id="identifierInput"
+                       th:value="${identifier}" required/>
+            </div>
+            <div class="gym-auth-field">
+                <label>Password</label>
+                <input type="password" name="password" required/>
+            </div>
+            <button type="submit" class="gym-auth-btn">Sign In</button>
+        </form>
+
+        <div class="gym-login-bottom">
+            Not a member yet? <a th:href="@{/register}">Join now</a>
+        </div>
+        <div class="gym-login-divider">or</div>
+        <div class="gym-login-bottom">
+            <a th:href="@{/forgot-password}">Forgot password?</a>
+        </div>
+    </div>
+</section>
+
+<!-- ===== ABOUT ===== -->
+<section class="landing-section" id="about">
+    <div class="landing-section-eyebrow">About the club</div>
+    <h2 class="landing-section-title">Built for those who push limits</h2>
+    <p class="landing-section-intro">
+        Istanbul Sports Club is a modern fitness destination combining premium
+        equipment, certified trainers, and flexible membership plans designed for
+        every kind of athlete — from first-timers to seasoned competitors.
+    </p>
+    <div class="landing-features">
+        <div class="feature-card">
+            <div class="feature-icon">✓</div>
+            <div class="feature-title">Modern Equipment</div>
+            <div class="feature-desc">State-of-the-art machines, free weights and functional training areas.</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">✓</div>
+            <div class="feature-title">Expert Trainers</div>
+            <div class="feature-desc">Certified personal trainers ready to design your perfect program.</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">✓</div>
+            <div class="feature-title">Flexible Plans</div>
+            <div class="feature-desc">Monthly, annual prepaid, or annual installment options for every goal.</div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== MEMBERSHIP ===== -->
+<section class="landing-section" id="membership"
+         style="background:var(--gym-page); border-radius:24px; margin: 0 24px;">
+    <div class="landing-section-eyebrow">Membership plans</div>
+    <h2 class="landing-section-title">Choose your tier</h2>
+    <p class="landing-section-intro">
+        Three membership tiers with progressively richer benefits.
+        Switch any time — your goals, your pace.
+    </p>
+    <div class="tier-cards">
+        <div class="tier-card">
+            <h3 class="tier-name">Classic</h3>
+            <div class="tier-price">750 ₺<span class="small"> / month</span></div>
+            <ul class="tier-features">
+                <li class="tier-feature">Full gym access</li>
+                <li class="tier-feature">Group fitness events</li>
+                <li class="tier-feature">Locker room</li>
+                <li class="tier-feature">Standard support</li>
+            </ul>
+            <a th:href="@{/register}" class="tier-cta">Become a Member</a>
+        </div>
+        <div class="tier-card featured">
+            <span class="tier-badge">Most popular</span>
+            <h3 class="tier-name">Gold</h3>
+            <div class="tier-price">1250 ₺<span class="small"> / month</span></div>
+            <ul class="tier-features">
+                <li class="tier-feature">Everything in Classic</li>
+                <li class="tier-feature">2 PT sessions / month</li>
+                <li class="tier-feature">Sauna access</li>
+                <li class="tier-feature">Priority booking</li>
+            </ul>
+            <a th:href="@{/register}" class="tier-cta">Become a Member</a>
+        </div>
+        <div class="tier-card">
+            <h3 class="tier-name">VIP</h3>
+            <div class="tier-price">2000 ₺<span class="small"> / month</span></div>
+            <ul class="tier-features">
+                <li class="tier-feature">Everything in Gold</li>
+                <li class="tier-feature">Unlimited PT sessions</li>
+                <li class="tier-feature">Nutrition consult</li>
+                <li class="tier-feature">Guest passes</li>
+            </ul>
+            <a th:href="@{/register}" class="tier-cta">Become a Member</a>
+        </div>
+    </div>
+</section>
+
+<!-- ===== CONTACT ===== -->
+<section class="landing-contact" id="contact">
+    <div class="landing-section-eyebrow">Get in touch</div>
+    <h2 class="landing-section-title">Visit our club</h2>
+    <p class="landing-section-intro">
+        Drop by, give us a call, or send us a message. We're here to help you start.
+    </p>
+    <div class="contact-grid">
+        <div>
+            <div class="contact-item-label">Phone</div>
+            <div class="contact-item-value">+90 212 555 00 00</div>
+        </div>
+        <div>
+            <div class="contact-item-label">Email</div>
+            <div class="contact-item-value">info@iscms.club</div>
+        </div>
+        <div>
+            <div class="contact-item-label">Hours</div>
+            <div class="contact-item-value">Mon–Fri 06:00–23:00<br>Sat–Sun 08:00–22:00</div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="landing-footer">
+    © 2026 ISTANBUL SPORTS CLUB · ALL RIGHTS RESERVED
+</footer>
 
 <script>
-    // Switches the identifier field's label and placeholder based on the
-    // selected role, mirroring Project 1's LoginFrame behavior:
-    //   Member  -> phone
-    //   Manager -> email
-    //   Trainer -> username
-    //   Admin   -> email
     function updateIdentifierLabel() {
-        var role = document.getElementById('roleSelect').value;
+        var role  = document.getElementById('roleSelect').value;
         var label = document.getElementById('identifierLabel');
         var input = document.getElementById('identifierInput');
 
         if (role === 'MEMBER') {
             label.textContent = 'Phone';
             input.placeholder = 'e.g. 5551234567';
-            input.type = 'tel';
-        } else if (role === 'TRAINER') {
-            label.textContent = 'Username';
-            input.placeholder = 'e.g. trainer1';
-            input.type = 'text';
-        } else {
-            // MANAGER and ADMIN both use email
+        } else if (role === 'MANAGER' || role === 'ADMIN') {
             label.textContent = 'Email';
-            input.placeholder = 'e.g. manager@isc.com';
-            input.type = 'email';
+            input.placeholder = 'e.g. user@isc.com';
+        } else {
+            label.textContent = 'Username';
+            input.placeholder = 'e.g. trainer123';
         }
     }
-
-    // Run once on page load to sync the label with the pre-selected role
-    // (important after a failed login attempt where the role is preserved)
     updateIdentifierLabel();
+
+    // Darken nav background after scrolling past hero
+    document.addEventListener('scroll', function() {
+        var nav = document.querySelector('.landing-nav');
+        if (window.scrollY > 60) {
+            nav.style.background = 'rgba(15,15,28,0.97)';
+        } else {
+            nav.style.background = 'rgba(26,26,46,0.85)';
+        }
+    });
 </script>
+
 </body>
 </html>

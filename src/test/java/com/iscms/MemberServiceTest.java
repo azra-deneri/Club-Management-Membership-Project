@@ -407,4 +407,73 @@ public class MemberServiceTest {
         ms.setStartDate(LocalDate.now().minusDays(30));
         return ms;
     }
+
+    // ============================================================
+    // computeMembershipEligibility — pure decision logic (no DB)
+    // ============================================================
+
+    @Test
+    void computeEligibility_activeNotOnHold_canFreezeAndCancel() {
+        Member m  = buildMember("5321234567", "x@x.com", LocalDate.now().minusYears(20));
+        m.setStatus("ACTIVE");
+        Membership ms = new Membership();
+        ms.setStatus("ACTIVE");
+        ms.setTier("GOLD");
+
+        MemberService.MembershipEligibility e =
+                memberService.computeMembershipEligibility(m, ms);
+
+        assertTrue(e.canFreeze());
+        assertTrue(e.canCancel());
+        assertTrue(e.canUpgrade());
+        assertFalse(e.canUnfreeze());
+    }
+
+    @Test
+    void computeEligibility_frozenMembership_canUnfreezeOnly() {
+        Member m  = buildMember("5321234567", "x@x.com", LocalDate.now().minusYears(20));
+        m.setStatus("FROZEN");
+        Membership ms = new Membership();
+        ms.setStatus("FROZEN");
+        ms.setTier("GOLD");
+
+        MemberService.MembershipEligibility e =
+                memberService.computeMembershipEligibility(m, ms);
+
+        assertTrue(e.canUnfreeze());
+        assertFalse(e.canFreeze());
+        assertFalse(e.canCancel());
+        assertFalse(e.canUpgrade());
+    }
+
+    @Test
+    void computeEligibility_vipTier_cannotUpgrade() {
+        Member m  = buildMember("5321234567", "x@x.com", LocalDate.now().minusYears(20));
+        m.setStatus("ACTIVE");
+        Membership ms = new Membership();
+        ms.setStatus("ACTIVE");
+        ms.setTier("VIP");
+
+        MemberService.MembershipEligibility e =
+                memberService.computeMembershipEligibility(m, ms);
+
+        assertFalse(e.canUpgrade());
+        assertTrue(e.canFreeze());
+    }
+
+    @Test
+    void computeEligibility_pendingCancellation_cannotCancelAgain() {
+        Member m  = buildMember("5321234567", "x@x.com", LocalDate.now().minusYears(20));
+        m.setStatus("ACTIVE");
+        m.setCancellationRequestedAt(java.time.LocalDateTime.now());
+        Membership ms = new Membership();
+        ms.setStatus("ACTIVE");
+        ms.setTier("GOLD");
+
+        MemberService.MembershipEligibility e =
+                memberService.computeMembershipEligibility(m, ms);
+
+        assertTrue(e.cancellationPending());
+        assertFalse(e.canCancel());
+    }
 }

@@ -5,17 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="06cc4173-bd97-4bab-bc48-a91a6eb413dc" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ForgotPasswordController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/RegisterController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/forgot-password.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/register-payment.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/templates/register.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/service/MemberService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/service/MemberService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/ManagerController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/DashboardController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/DashboardController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/LoginController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/LoginController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/MemberController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/iscms/web/controller/MemberController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/templates/admin/dashboard.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/templates/admin/dashboard.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/templates/dashboard.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/templates/dashboard.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/templates/login.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/templates/login.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/templates/manager/members.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/members.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/templates/manager/requests.html" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/templates/manager/requests.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/java/com/iscms/AuthServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/iscms/AuthServiceTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/java/com/iscms/ManagerServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/iscms/ManagerServiceTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/java/com/iscms/MemberServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/iscms/MemberServiceTest.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

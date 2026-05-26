@@ -59,6 +59,24 @@ public class LoginController {
 
         Object user = result.getUser();
 
+        // Role mismatch guard: MANAGER and ADMIN share the same login endpoint
+        // (both authenticate against the manager table), so we have to verify
+        // that the role the user selected on the form actually matches their
+        // account's role in the database. Without this an admin who picks
+        // "Manager" on the form would land on the manager dashboard, and vice
+        // versa — confusing at best, a security gap at worst.
+        if (user instanceof com.iscms.model.Manager m) {
+            String actualRole = m.getRole();   // "MANAGER" or "ADMIN" from DB
+            if (!actualRole.equals(role)) {
+                model.addAttribute("error",
+                        "This account is registered as " + actualRole
+                                + ". Please select the correct role and try again.");
+                model.addAttribute("role", role);
+                model.addAttribute("identifier", identifier);
+                return "login";
+            }
+        }
+
         // PAYMENT_HOLD is applied by AuthService.loginMember if 3+ OVERDUE.
         // Member.status follows membership.status — PASSIVE only when membership
         // contract has expired, not because of unpaid installments.

@@ -1,0 +1,632 @@
+/* =========================================================================
+   ISC-MS — Istanbul Sports Club shared stylesheet
+   Palette: charcoal #1a1a2e + vibrant red #e63946
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+    /* Brand palette */
+    --gym-charcoal:        #1a1a2e;   /* primary dark */
+    --gym-charcoal-soft:   #25253d;   /* lighter dark for layered surfaces */
+    --gym-red:             #e63946;   /* accent / CTA */
+    --gym-red-hover:       #c1121f;   /* darker red on hover */
+    --gym-red-soft:        #ffe5e7;   /* light tint */
+
+    /* Neutrals */
+    --gym-page:            #f5f5f7;
+    --gym-card:            #ffffff;
+    --gym-border:          #ececec;
+    --gym-text:            #1d1d1f;
+    --gym-text-muted:      #6e6e73;
+    --gym-text-on-dark:    #ffffff;
+    --gym-text-dim-on-dark:#b8b8c8;
+
+    /* Status colors (reused from earlier palette) */
+    --status-active:       #135200;
+    --status-active-bg:    #f6ffed;
+    --status-frozen:       #0050b3;
+    --status-frozen-bg:    #e6f7ff;
+    --status-passive:      #6e6e73;
+    --status-passive-bg:   #f5f5f7;
+    --status-warning:      #874d00;
+    --status-warning-bg:   #fff7e6;
+    --status-danger:       #cf1322;
+    --status-danger-bg:    #fff2f0;
+}
+
+/* ----- Base ----- */
+body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--gym-page);
+    margin: 0;
+    color: var(--gym-text);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ----- Top branding bar ----- */
+.gym-topbar {
+    background: var(--gym-charcoal);
+    color: var(--gym-text-on-dark);
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+}
+.gym-brand {
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--gym-text-on-dark);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.gym-brand .gym-brand-accent {
+    color: var(--gym-red);
+}
+.gym-brand .gym-brand-mark {
+    font-size: 20px;
+}
+.gym-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--gym-text-dim-on-dark);
+}
+.gym-signout {
+    color: var(--gym-text-on-dark);
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 7px 14px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+.gym-signout:hover {
+    background: var(--gym-red);
+    border-color: var(--gym-red);
+}
+
+/* ----- Main wrapper ----- */
+.gym-wrap {
+    max-width: 1080px;
+    margin: 28px auto;
+    padding: 0 24px;
+}
+
+/* ----- Welcome card ----- */
+.welcome-card {
+    background: linear-gradient(135deg, var(--gym-charcoal) 0%, var(--gym-charcoal-soft) 100%);
+    color: var(--gym-text-on-dark);
+    padding: 28px 32px;
+    border-radius: 14px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 18px rgba(26,26,46,0.18);
+    position: relative;
+    overflow: hidden;
+}
+.welcome-card::after {
+    content: "";
+    position: absolute;
+    right: -40px; top: -40px;
+    width: 160px; height: 160px;
+    background: var(--gym-red);
+    opacity: 0.12;
+    border-radius: 50%;
+    pointer-events: none;
+}
+.welcome-greeting {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--gym-text-dim-on-dark);
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+.welcome-name {
+    font-size: 28px;
+    font-weight: 800;
+    margin: 0 0 12px 0;
+    letter-spacing: -0.5px;
+}
+.welcome-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+.gym-pill {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+.gym-pill-role {
+    background: var(--gym-red);
+    color: white;
+}
+.gym-pill-status-active   { background: rgba(46,213,115,0.18); color: #6effa9; }
+.gym-pill-status-frozen   { background: rgba(72,149,239,0.20); color: #9cc7ff; }
+.gym-pill-status-passive  { background: rgba(255,255,255,0.12); color: #d2d2d7; }
+.gym-pill-status-payment_hold { background: rgba(230,57,70,0.20); color: #ff8a93; }
+
+/* ----- Quick stats row ----- */
+.quick-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+}
+.quick-stat {
+    background: var(--gym-card);
+    border: 1px solid var(--gym-border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+}
+.quick-stat-label {
+    font-size: 11px;
+    color: var(--gym-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.quick-stat-value {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--gym-text);
+    line-height: 1.1;
+}
+.quick-stat-sub {
+    font-size: 12px;
+    color: var(--gym-text-muted);
+    margin-top: 4px;
+}
+.quick-stat::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--gym-red);
+}
+
+/* ----- Navigation grid (replaces old .links) ----- */
+.gym-nav-card {
+    background: var(--gym-card);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+    margin-bottom: 24px;
+}
+.gym-nav-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--gym-text-muted);
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+.gym-nav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+}
+.gym-nav-tile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    background: var(--gym-page);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--gym-text);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.15s;
+}
+.gym-nav-tile:hover {
+    background: var(--gym-charcoal);
+    color: white;
+    transform: translateY(-1px);
+}
+.gym-nav-tile .gym-nav-icon {
+    color: var(--gym-red);
+    font-size: 16px;
+}
+.gym-nav-tile:hover .gym-nav-icon {
+    color: white;
+}
+
+/* ----- Alerts / banners ----- */
+.gym-alert {
+    padding: 16px 20px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+    font-size: 14px;
+    line-height: 1.5;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+.gym-alert-warning {
+    background: var(--status-warning-bg);
+    border: 1px solid #ffd591;
+    color: var(--status-warning);
+}
+.gym-alert-danger {
+    background: var(--status-danger-bg);
+    border: 1px solid #ffccc7;
+    color: var(--status-danger);
+}
+.gym-alert-info {
+    background: var(--status-frozen-bg);
+    border: 1px solid #91d5ff;
+    color: var(--status-frozen);
+}
+.gym-alert-action {
+    background: var(--gym-red);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    align-self: center;
+}
+.gym-alert-action:hover {
+    background: var(--gym-red-hover);
+}
+
+/* ----- Auth pages (login, register, forgot-password) shared bits ----- */
+.gym-auth-page {
+    min-height: 100vh;
+    background: var(--gym-page);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.gym-auth-card {
+    width: 100%;
+    max-width: 420px;
+    background: white;
+    border-radius: 14px;
+    padding: 32px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+.gym-auth-brand {
+    text-align: center;
+    margin-bottom: 8px;
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: var(--gym-charcoal);
+    text-transform: uppercase;
+}
+.gym-auth-brand .gym-brand-accent {
+    color: var(--gym-red);
+}
+.gym-auth-subtitle {
+    text-align: center;
+    color: var(--gym-text-muted);
+    font-size: 13px;
+    margin-bottom: 22px;
+}
+.gym-auth-btn {
+    width: 100%;
+    background: var(--gym-red);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: background 0.15s;
+}
+.gym-auth-btn:hover {
+    background: var(--gym-red-hover);
+}
+
+/* =========================================================
+   LANDING / LOGIN PAGE — MacFit-inspired layout
+   ========================================================= */
+
+/* --- Sticky top nav --- */
+.landing-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+    padding: 18px 40px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(26,26,46,0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background 0.3s;
+}
+.landing-nav-brand {
+    color: white; font-weight: 800; font-size: 14px;
+    letter-spacing: 1.8px; text-transform: uppercase;
+    text-decoration: none;
+}
+.landing-nav-links {
+    display: flex; gap: 26px; align-items: center;
+}
+.landing-nav-links a {
+    color: rgba(255,255,255,0.85);
+    text-decoration: none; font-size: 12px;
+    font-weight: 500; letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: color 0.15s;
+}
+.landing-nav-links a:hover { color: var(--gym-red); }
+.landing-nav-cta {
+    background: var(--gym-red); color: white !important;
+    padding: 8px 18px; border-radius: 6px;
+    letter-spacing: 1px;
+}
+.landing-nav-cta:hover { background: var(--gym-red-hover); }
+
+/* --- Hero --- */
+.landing-hero {
+    min-height: 100vh;
+    background:
+        linear-gradient(120deg, rgba(26,26,46,0.78) 0%, rgba(26,26,46,0.55) 100%),
+        url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1920&q=80')
+        center/cover no-repeat;
+    color: white;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    padding: 110px 60px 70px;
+    gap: 60px;
+}
+.landing-hero-form {
+    background: white;
+    color: var(--gym-text);
+    padding: 36px 38px;
+    border-radius: 14px;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+    max-width: 440px;
+    justify-self: end;
+    width: 100%;
+    box-sizing: border-box;
+}
+.landing-hero-message { color: white; }
+.landing-hero-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 13px;
+    color: var(--gym-red);
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+.landing-hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 78px;
+    line-height: 0.95;
+    letter-spacing: 2px;
+    margin: 0 0 20px 0;
+    color: white;
+}
+.landing-hero-title .accent { color: var(--gym-red); }
+.landing-hero-sub {
+    font-size: 16px; line-height: 1.6;
+    color: rgba(255,255,255,0.85);
+    max-width: 460px;
+}
+
+@media (max-width: 980px) {
+    .landing-hero {
+        grid-template-columns: 1fr;
+        padding: 130px 24px 60px;
+    }
+    .landing-hero-form { justify-self: stretch; max-width: none; }
+    .landing-hero-title { font-size: 54px; }
+}
+
+/* --- Generic section --- */
+.landing-section {
+    padding: 80px 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.landing-section-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 12px;
+    color: var(--gym-red);
+    font-weight: 700;
+    margin-bottom: 10px;
+    text-align: center;
+}
+.landing-section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    text-align: center;
+    color: var(--gym-charcoal);
+    margin: 0 0 16px 0;
+    letter-spacing: 1.5px;
+}
+.landing-section-intro {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--gym-text-muted);
+    max-width: 720px;
+    margin: 0 auto 48px auto;
+    text-align: center;
+}
+
+/* --- About features --- */
+.landing-features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+.feature-card { text-align: center; padding: 20px; }
+.feature-icon {
+    width: 56px; height: 56px;
+    margin: 0 auto 16px;
+    background: var(--gym-charcoal);
+    color: var(--gym-red);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 800;
+}
+.feature-title {
+    font-weight: 700; font-size: 16px;
+    margin-bottom: 6px; color: var(--gym-text);
+}
+.feature-desc {
+    font-size: 13px; color: var(--gym-text-muted); line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+    .landing-features { grid-template-columns: 1fr; }
+}
+
+/* --- Membership tier cards --- */
+.tier-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+    margin-top: 8px;
+}
+.tier-card {
+    background: white;
+    border: 1px solid var(--gym-border);
+    border-radius: 14px;
+    padding: 32px 28px;
+    text-align: center;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.tier-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.10);
+}
+.tier-card.featured {
+    background: var(--gym-charcoal);
+    color: white;
+    border-color: var(--gym-charcoal);
+}
+.tier-card.featured .tier-name { color: white; }
+.tier-card.featured .tier-price { color: var(--gym-red); }
+.tier-badge {
+    position: absolute; top: -12px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--gym-red); color: white;
+    padding: 4px 14px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 1.2px; text-transform: uppercase;
+}
+.tier-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 34px;
+    letter-spacing: 2px;
+    margin: 0 0 4px 0;
+    color: var(--gym-charcoal);
+}
+.tier-price {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--gym-charcoal);
+    margin: 14px 0;
+}
+.tier-price .small {
+    font-size: 14px;
+    color: var(--gym-text-muted);
+    font-weight: 500;
+}
+.tier-card.featured .tier-price .small { color: rgba(255,255,255,0.6); }
+.tier-features {
+    list-style: none;
+    padding: 0;
+    margin: 18px 0 26px 0;
+}
+.tier-feature {
+    padding: 9px 0;
+    font-size: 14px;
+    color: var(--gym-text);
+    border-top: 1px solid var(--gym-border);
+}
+.tier-feature:first-child { border-top: none; }
+.tier-card.featured .tier-feature {
+    color: rgba(255,255,255,0.88);
+    border-color: rgba(255,255,255,0.1);
+}
+.tier-cta {
+    display: inline-block;
+    background: var(--gym-red);
+    color: white;
+    padding: 11px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: background 0.15s;
+}
+.tier-cta:hover { background: var(--gym-red-hover); color: white; }
+
+@media (max-width: 880px) {
+    .tier-cards { grid-template-columns: 1fr; }
+}
+
+/* --- Contact section --- */
+.landing-contact {
+    background: var(--gym-charcoal);
+    color: white;
+    padding: 70px 40px;
+}
+.landing-contact .landing-section-title { color: white; }
+.landing-contact .landing-section-intro { color: rgba(255,255,255,0.72); }
+.contact-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 900px;
+    margin: 24px auto 0;
+    text-align: center;
+}
+.contact-item-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gym-red);
+    margin-bottom: 6px;
+    font-weight: 700;
+}
+.contact-item-value {
+    font-size: 15px;
+    color: rgba(255,255,255,0.92);
+    line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+    .contact-grid { grid-template-columns: 1fr; }
+}
+
+/* --- Footer --- */
+.landing-footer {
+    background: #0f0f1c;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    padding: 22px 20px;
+    font-size: 12px;
+    letter-spacing: 1.2px;
+}

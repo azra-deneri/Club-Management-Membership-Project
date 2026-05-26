@@ -87,4 +87,57 @@ public class ManagerServiceTest {
         assertEquals(1, result.size());
         assertEquals("Test", result.get(0).getFullName());
     }
+
+    // ============================================================
+    // validateManagerForRegistration — UI-form validation rules
+    // Returns null on success, error message String on failure.
+    // ============================================================
+
+    @Test
+    void validateManagerForRegistration_validInput_returnsNull() {
+        when(managerDAO.findByEmail("new@isc.com")).thenReturn(java.util.Optional.empty());
+        String result = managerService.validateManagerForRegistration(
+                "New Manager", "newmgr", "new@isc.com", "password123", "MANAGER");
+        assertNull(result);
+    }
+
+    @Test
+    void validateManagerForRegistration_blankFullName_returnsError() {
+        String result = managerService.validateManagerForRegistration(
+                "  ", "newmgr", "new@isc.com", "password123", "MANAGER");
+        assertEquals("Full name is required.", result);
+    }
+
+    @Test
+    void validateManagerForRegistration_shortPassword_returnsError() {
+        String result = managerService.validateManagerForRegistration(
+                "New Manager", "newmgr", "new@isc.com", "short", "MANAGER");
+        assertEquals("Password must be at least 8 characters.", result);
+    }
+
+    @Test
+    void validateManagerForRegistration_invalidRole_returnsError() {
+        String result = managerService.validateManagerForRegistration(
+                "New Manager", "newmgr", "new@isc.com", "password123", "TRAINER");
+        assertEquals("Role must be MANAGER or ADMIN.", result);
+    }
+
+    @Test
+    void validateManagerForRegistration_duplicateEmail_returnsError() {
+        Manager existing = new Manager();
+        existing.setEmail("dup@isc.com");
+        when(managerDAO.findByEmail("dup@isc.com")).thenReturn(java.util.Optional.of(existing));
+
+        String result = managerService.validateManagerForRegistration(
+                "New Manager", "newmgr", "dup@isc.com", "password123", "MANAGER");
+        assertEquals("Email is already in use by another account.", result);
+    }
+
+    @Test
+    void validateManagerForRegistration_adminRole_returnsNull() {
+        when(managerDAO.findByEmail("admin@isc.com")).thenReturn(java.util.Optional.empty());
+        String result = managerService.validateManagerForRegistration(
+                "New Admin", "newadm", "admin@isc.com", "password123", "ADMIN");
+        assertNull(result);
+    }
 }

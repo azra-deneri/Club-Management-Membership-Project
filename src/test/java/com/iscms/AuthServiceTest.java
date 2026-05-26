@@ -10,6 +10,7 @@ import com.iscms.model.Membership;
 import com.iscms.model.Trainer;
 import com.iscms.service.AuthService;
 import com.iscms.service.LoginResult;
+import com.iscms.service.MemberService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,15 +34,21 @@ public class AuthServiceTest {
     @Mock private ManagerDAO managerDAO;
     @Mock private TrainerDAO trainerDAO;
     @Mock private MembershipDAO membershipDAO;
+    // MemberService is also mocked — loginMember calls markOverdueInstallments
+    // and checkAndApplyPaymentHold on the service, and those would otherwise
+    // hit a real DAO + DBConnection during the test.
+    @Mock private MemberService memberService;
 
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
-        // Inject mocks via test constructor — avoids real DAO instantiation
-        authService = new AuthService(memberDAO, managerDAO, trainerDAO, membershipDAO);
+        // Inject mocks via the 5-arg constructor — avoids real DAO instantiation
+        // and isolates AuthService from MemberService's side effects (overdue
+        // installment marking, payment-hold check) during these tests.
+        authService = new AuthService(memberDAO, managerDAO, trainerDAO,
+                membershipDAO, memberService);
     }
-
     // --- Member Login Tests ---
 
     // No account found with the given phone number

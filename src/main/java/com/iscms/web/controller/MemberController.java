@@ -163,24 +163,22 @@ public class MemberController {
 
         if (ms != null) {
             long daysLeft = ChronoUnit.DAYS.between(LocalDate.now(), ms.getEndDate());
-            boolean isFrozen     = "FROZEN".equals(ms.getStatus());
-            boolean isActive     = "ACTIVE".equals(ms.getStatus());
-            boolean isPassive    = "PASSIVE".equals(ms.getStatus());
-            boolean onHold       = "PAYMENT_HOLD".equals(member.getStatus());
 
-            // Has this member already submitted a cancellation request?
-            boolean cancellationPending = member.getCancellationRequestedAt() != null;
+            // Eligibility (which actions are allowed) is decided by the service.
+            // Controller just wires the pre-computed flags to the template.
+            MemberService.MembershipEligibility e =
+                    memberService.computeMembershipEligibility(member, ms);
 
             model.addAttribute("member", member);
             model.addAttribute("membership", ms);
             model.addAttribute("daysLeft", daysLeft);
-            model.addAttribute("onPaymentHold", onHold);
-            model.addAttribute("canUpgrade",  isActive && !"VIP".equals(ms.getTier()) && !onHold);
-            model.addAttribute("canFreeze",   isActive && !onHold);
-            model.addAttribute("canUnfreeze", isFrozen);
-            model.addAttribute("canCancel",   isActive && !onHold && !cancellationPending);
-            model.addAttribute("cancellationPending", cancellationPending);
-            model.addAttribute("showRenew",   isPassive);
+            model.addAttribute("onPaymentHold",        e.onPaymentHold());
+            model.addAttribute("canUpgrade",           e.canUpgrade());
+            model.addAttribute("canFreeze",            e.canFreeze());
+            model.addAttribute("canUnfreeze",          e.canUnfreeze());
+            model.addAttribute("canCancel",            e.canCancel());
+            model.addAttribute("cancellationPending",  e.cancellationPending());
+            model.addAttribute("showRenew",            e.showRenew());
             return "member/membership";
         }
 

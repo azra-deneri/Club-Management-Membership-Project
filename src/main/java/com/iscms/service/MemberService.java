@@ -817,4 +817,51 @@ public class MemberService {
         }
         return count;
     }
+
+    // ============================================================
+    // Membership eligibility — decision logic centralised here so
+    // controllers stay thin and templates remain condition-free.
+    // ============================================================
+
+    /**
+     * Pre-computed booleans driving the member's membership UI.
+     * Pure data — no behaviour — so controllers can pass these straight
+     * to the view layer without re-deriving them from raw status strings.
+     */
+    public record MembershipEligibility(
+            boolean canUpgrade,
+            boolean canFreeze,
+            boolean canUnfreeze,
+            boolean canCancel,
+            boolean showRenew,
+            boolean onPaymentHold,
+            boolean cancellationPending
+    ) {}
+
+    /**
+     * Computes which actions are currently available for the given member's
+     * membership. The caller (controller) must supply a non-null Member and
+     * a Membership instance — typically the active one, falling back to the
+     * latest history entry when no active membership exists.
+     */
+    public MembershipEligibility computeMembershipEligibility(Member m, Membership ms) {
+        if (m == null)  throw new IllegalArgumentException("Member is required.");
+        if (ms == null) throw new IllegalArgumentException("Membership is required.");
+
+        boolean isFrozen  = "FROZEN".equals(ms.getStatus());
+        boolean isActive  = "ACTIVE".equals(ms.getStatus());
+        boolean isPassive = "PASSIVE".equals(ms.getStatus());
+        boolean onHold    = "PAYMENT_HOLD".equals(m.getStatus());
+        boolean pending   = m.getCancellationRequestedAt() != null;
+
+        return new MembershipEligibility(
+                isActive && !"VIP".equals(ms.getTier()) && !onHold,  // canUpgrade
+                isActive && !onHold,                                 // canFreeze
+                isFrozen,                                            // canUnfreeze
+                isActive && !onHold && !pending,                     // canCancel
+                isPassive,                                           // showRenew
+                onHold,                                              // onPaymentHold
+                pending                                              // cancellationPending
+        );
+    }
 }
