@@ -56,14 +56,11 @@ import java.util.Optional;
 public class MemberController {
 
     private final MemberService memberService;
-    private final com.iscms.dao.MemberDAO memberDAO;
     // Stateless processor — safe to share across requests
     private final MockPaymentProcessor paymentProcessor = new MockPaymentProcessor();
 
-    public MemberController(MemberService memberService,
-                            com.iscms.dao.MemberDAO memberDAO) {
+    public MemberController(MemberService memberService) {
         this.memberService = memberService;
-        this.memberDAO = memberDAO;
     }
 
     // ========================================================================
@@ -550,7 +547,7 @@ public class MemberController {
         Member member = loadCurrentMember(session);
 
         try {
-            memberDAO.clearCancellationRequested(member.getMemberId());
+            memberService.clearCancellationRequested(member.getMemberId());
             memberService.getMemberById(member.getMemberId())
                     .ifPresent(refreshed -> session.setAttribute("user", refreshed));
             ra.addFlashAttribute("success",

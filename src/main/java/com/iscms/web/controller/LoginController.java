@@ -1,6 +1,6 @@
 package com.iscms.web.controller;
 
-import com.iscms.dao.MemberDAO;
+
 import com.iscms.model.Member;
 import com.iscms.service.AuthService;
 import com.iscms.service.LoginResult;
@@ -18,14 +18,12 @@ public class LoginController {
 
     private final AuthService authService;
     private final MemberService memberService;
-    private final MemberDAO memberDAO;
+
 
     public LoginController(AuthService authService,
-                           MemberService memberService,
-                           MemberDAO memberDAO) {
+                           MemberService memberService) {
         this.authService = authService;
         this.memberService = memberService;
-        this.memberDAO = memberDAO;
     }
 
     @GetMapping("/login")

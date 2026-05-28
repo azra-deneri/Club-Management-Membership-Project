@@ -610,7 +610,7 @@ public class MemberService {
         return "OBESE";
     }
 
-    private void validateMember(Member member) {
+    public void validateMember(Member member) {
         if (member.getDateOfBirth() == null)
             throw new IllegalArgumentException("Date of birth is required.");
         if (member.getPhone() == null || member.getPhone().isBlank())
@@ -863,5 +863,13 @@ public class MemberService {
                 onHold,                                              // onPaymentHold
                 pending                                              // cancellationPending
         );
+    }
+
+    public void clearCancellationRequested(int memberId) {
+        memberDAO.clearCancellationRequested(memberId);
+    }
+
+    public List<Membership> getAllMembershipsForMember(int memberId) {
+        return membershipDAO.findAllByMemberId(memberId);
     }
 }

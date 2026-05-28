@@ -44,15 +44,6 @@ public class SpringConfig {
         return new PTService();
     }
 
-    @Bean
-    public MemberDAO memberDAO() {
-        return new MemberDAOImpl();
-    }
-
-    @Bean
-    public MembershipDAO membershipDAO() {
-        return new MembershipDAOImpl();
-    }
 
     @Bean
     public ReportService reportService() {

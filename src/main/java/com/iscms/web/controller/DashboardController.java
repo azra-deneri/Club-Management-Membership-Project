@@ -1,7 +1,7 @@
 package com.iscms.web.controller;
 
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import com.iscms.dao.MembershipDAO;
+
 import com.iscms.model.Manager;
 import com.iscms.model.Member;
 import com.iscms.model.Membership;
@@ -45,12 +45,9 @@ import java.util.Optional;
 @Controller
 public class DashboardController {
 
-    private final MembershipDAO membershipDAO;
     private final MemberService memberService;
 
-    public DashboardController(MembershipDAO membershipDAO,
-                               MemberService memberService) {
-        this.membershipDAO = membershipDAO;
+    public DashboardController(MemberService memberService) {
         this.memberService = memberService;
     }
 
@@ -186,7 +183,7 @@ public class DashboardController {
 
     /** True if the member's most recent membership has not yet ended. */
     private boolean hasFutureEndDate(int memberId) {
-        return membershipDAO.findAllByMemberId(memberId).stream()
+        return memberService.getAllMembershipsForMember(memberId).stream()
                 .filter(ms -> ms.getEndDate() != null)
                 .max((a, b) -> a.getEndDate().compareTo(b.getEndDate()))
                 .map(latest -> !latest.getEndDate().isBefore(LocalDate.now()))

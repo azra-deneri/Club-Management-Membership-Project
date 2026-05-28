@@ -180,6 +180,17 @@ public class RegisterController {
                         tier, packageType, paymentMethod,
                         "Invalid tier or package selection.");
             }
+
+            // Validate member fields BEFORE payment — age, phone format, duplicates.
+            try {
+                memberService.validateMember(m);
+            } catch (IllegalArgumentException ex) {
+                return renderError(model, fullName, dob, gender, phone, email,
+                        weight, height, emergencyContactName, emergencyContactPhone,
+                        tier, packageType, paymentMethod,
+                        ex.getMessage());
+            }
+
             // Stash for the payment step.
             session.setAttribute(S_MEMBER,  m);
             session.setAttribute(S_TIER,    tier);
