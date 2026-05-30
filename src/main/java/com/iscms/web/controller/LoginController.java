@@ -1,6 +1,6 @@
 package com.iscms.web.controller;
 
-
+import jakarta.servlet.http.HttpServletRequest;
 import com.iscms.model.Member;
 import com.iscms.service.AuthService;
 import com.iscms.service.LoginResult;
@@ -36,6 +36,7 @@ public class LoginController {
                         @RequestParam String identifier,
                         @RequestParam String password,
                         HttpSession session,
+                        HttpServletRequest request,
                         Model model) {
 
         // For MEMBER we use the FROZEN-tolerant variant so frozen members can
@@ -79,6 +80,10 @@ public class LoginController {
         // Member.status follows membership.status — PASSIVE only when membership
         // contract has expired, not because of unpaid installments.
 
+        // Prevent session fixation and stale-role carryover: drop any existing
+        // session (e.g. a previous MEMBER login) and start a fresh one before
+        // storing the newly authenticated user.
+        request.changeSessionId();
         session.setAttribute("user", user);
         session.setAttribute("role", role);
         return "redirect:/dashboard";
