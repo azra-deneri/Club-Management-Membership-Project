@@ -368,7 +368,7 @@ public class AuthServiceTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> authService.changeTrainerPasswordSelf(t, "oldpass1", "abc"));
-        assertTrue(ex.getMessage().toLowerCase().contains("6 characters"));
+        assertTrue(ex.getMessage().toLowerCase().contains("8 characters"));
         verify(trainerDAO, never()).updatePassword(anyInt(), anyString());
     }
 

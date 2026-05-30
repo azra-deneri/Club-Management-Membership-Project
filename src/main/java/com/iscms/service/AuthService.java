@@ -282,7 +282,7 @@ public class AuthService {
     // Trainer self-service password change (from My Profile, web only).
     // Mirrors changeManagerPasswordSelf — all business rules enforced here:
     //   - current password must be correct
-    //   - new password must be at least 6 chars (trainer policy)
+    //   - new password must be at least 8 chars
     //   - new password must differ from the current one
     // Returns ResetResult so the controller can render a friendly message.
     public ResetResult changeTrainerPasswordSelf(Trainer trainer,
@@ -291,8 +291,8 @@ public class AuthService {
         if (trainer == null) return ResetResult.NOT_FOUND;
         if (currentPlainPw == null || currentPlainPw.isBlank())
             throw new IllegalArgumentException("Current password is required.");
-        if (newPlainPw == null || newPlainPw.length() < 6)
-            throw new IllegalArgumentException("New password must be at least 6 characters.");
+        if (newPlainPw == null || newPlainPw.length() < 8)
+            throw new IllegalArgumentException("New password must be at least 8 characters.");
 
         // Verify current password against stored BCrypt hash
         if (!BCrypt.checkpw(currentPlainPw, trainer.getPassword()))
