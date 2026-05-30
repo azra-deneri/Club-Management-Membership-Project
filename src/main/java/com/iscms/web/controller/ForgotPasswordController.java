@@ -73,6 +73,13 @@ public class ForgotPasswordController {
                     result = authService.resetManagerPasswordByEmail(identifier.trim(), newPassword);
                     roleLabel = "Manager";
                 }
+
+                case "ADMIN" -> {
+                    // Admins live in the manager table; reset by email like managers.
+                    result = authService.resetManagerPasswordByEmail(identifier.trim(), newPassword);
+                    roleLabel = "Admin";
+                }
+
                 case "TRAINER" -> {
                     result = authService.resetTrainerPasswordByUsername(identifier.trim(), newPassword);
                     roleLabel = "Trainer";
